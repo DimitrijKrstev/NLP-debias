@@ -9,5 +9,8 @@ wheels/
 # Virtual environments
 .venv
 
+.vscode/
+
 dataset/data
 .env
+mlruns/

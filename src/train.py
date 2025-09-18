@@ -4,9 +4,9 @@ import mlflow
 import torch
 from transformers import DataCollatorForSeq2Seq, Trainer, TrainingArguments
 
-from src.constants import OUTPUT_DIR
-from src.dataset.utils import create_debiasing_prompt, get_train_test_dataset
-from utils import load_peft_model_and_tokenizer
+from constants import OUTPUT_DIR
+from src.dataset.preprocess import create_debiasing_prompt, get_train_test_dataset
+from src.utils import load_peft_model_and_tokenizer
 
 logger = logging.getLogger(__name__)
 
@@ -21,18 +21,16 @@ def train_model(
 
     model, tokenizer = load_peft_model_and_tokenizer(model_name, quantize)
 
-    logger.info("Loading and preprocessing dataset")
-    train_dataset, test_dataset = get_train_test_dataset()
+    logger.info("Loading and pre-processing dataset")
+    train_dataset, test_dataset = get_train_test_dataset(tokenizer)
 
     data_collator = DataCollatorForSeq2Seq(
         tokenizer=tokenizer, model=model, padding=True, label_pad_token_id=-100
     )
 
-    training_args = get_training_args()
-
     trainer = Trainer(
         model=model,
-        args=training_args,
+        args=get_training_args(),
         train_dataset=train_dataset,
         eval_dataset=test_dataset,
         data_collator=data_collator,
@@ -86,7 +84,7 @@ def get_training_args() -> TrainingArguments:
         logging_steps=50,
         eval_strategy="steps",
         eval_steps=200,
-        save_steps=500,
+        save_steps=600,
         save_total_limit=3,
         load_best_model_at_end=True,
         metric_for_best_model="eval_loss",
@@ -96,12 +94,4 @@ def get_training_args() -> TrainingArguments:
         remove_unused_columns=False,
         report_to=["mlflow"],
         run_name="qwen3-debiasing",
-    )
-
-
-if __name__ == "__main__":
-    train_model(
-        False,
-        "nlp-debias",
-        "Qwen/Qwen-3.5-4B",
     )

@@ -12,7 +12,7 @@ HF_TOKEN = os.getenv("HF_TOKEN")
 logger = getLogger(__name__)
 
 
-def load_peft_model_and_tokenizer(model_name: str, quantize: bool) -> Any:
+def load_peft_model_and_tokenizer(model_name: str, quantize: bool) -> tuple[Any, Any]:
     logger.info(f"Loading model: {model_name}")
 
     model, tokenizer = get_model_and_tokenizer(model_name, quantize)
@@ -67,7 +67,7 @@ def load_model(model_name: str, quantize: bool) -> Any:
     model = AutoModelForCausalLM.from_pretrained(
         model_name,
         quantization_config=bnb_cfg,
-        torch_dtype=torch.float16,
+        dtype=torch.float16,
         token=HF_TOKEN,
         device_map="auto",
         low_cpu_mem_usage=True,
