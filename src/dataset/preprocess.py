@@ -28,7 +28,7 @@ def load_wnc_from_csv() -> DataFrame:
     main_file = dataset_path / "biased.full"
     if not main_file.exists():
         raise FileNotFoundError(
-            f"No file named 'biased.full' found at {main_file}, have you run download-dataset?"
+            f"No file named 'biased.full' found at {main_file}, have you ran download-dataset?"
         )
     logger.info(f"Loading dataset from {main_file}")
 
@@ -36,7 +36,6 @@ def load_wnc_from_csv() -> DataFrame:
 
 
 def preprocess_data(dataframe: DataFrame) -> list[WNCData]:
-
     dataframe.drop(columns=["id", "src_tok", "tgt_tok", "tgt_parse_tags"], inplace=True)
     dataframe = dataframe.rename(
         columns={"src_raw": WNCColumn.BIASED, "tgt_raw": WNCColumn.NEUTRAL}
@@ -72,32 +71,47 @@ def split_and_tokenize_rows(
     test_dataset = Dataset.from_list([data.to_dict() for data in test_set])
 
     train_dataset = train_dataset.map(
-        lambda data: tokenize_data(data, tokenizer), batched=True
+        lambda data: tokenize_data(data, tokenizer),
+        batched=True,
+        remove_columns=train_dataset.column_names,
     )
     test_dataset = test_dataset.map(
-        lambda data: tokenize_data(data, tokenizer), batched=True
+        lambda data: tokenize_data(data, tokenizer),
+        batched=True,
+        remove_columns=test_dataset.column_names,
     )
 
     return train_dataset, test_dataset
 
 
 def tokenize_data(data: dict, tokenizer: Any) -> dict:
-    model_inputs = tokenizer(
-        data[WNCColumn.BIASED],
-        truncation=True,
-        # Skip padding, data collator does batched padding
-        padding=False,
-    )
+    batched_inputs = data["model_input_text"]
+    batched_targets = data[WNCColumn.NEUTRAL]
 
-    labels = tokenizer(
-        data[WNCColumn.NEUTRAL],
-        truncation=True,
-        padding=False,
-    )
+    results = {
+        "input_ids": [],
+        "attention_mask": [],
+    }
 
-    model_inputs["labels"] = labels["input_ids"]
+    full_texts = [
+        f"{input_text}\n\nOutput:\n{target_text}{tokenizer.eos_token}"
+        for input_text, target_text in zip(batched_inputs, batched_targets)
+    ]
 
-    return model_inputs
+    tokens_list = [
+        tokenizer(
+            text,
+            truncation=True,
+            max_length=512,
+            padding=False,
+            return_tensors=None,
+        )
+        for text in full_texts
+    ]
+    results["input_ids"] = [tokens["input_ids"] for tokens in tokens_list]
+    results["attention_mask"] = [tokens["attention_mask"] for tokens in tokens_list]
+
+    return results
 
 
 def create_debiasing_prompt(biased_text: str) -> str:

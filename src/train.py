@@ -2,11 +2,11 @@ import logging
 
 import mlflow
 import torch
-from transformers import DataCollatorForSeq2Seq, Trainer, TrainingArguments
+from transformers import DataCollatorForLanguageModeling, Trainer, TrainingArguments
 
 from constants import OUTPUT_DIR
-from src.dataset.preprocess import create_debiasing_prompt, get_train_test_dataset
-from src.utils import load_peft_model_and_tokenizer
+from dataset.preprocess import create_debiasing_prompt, get_train_test_dataset
+from utils import load_peft_model_and_tokenizer
 
 logger = logging.getLogger(__name__)
 
@@ -20,12 +20,13 @@ def train_model(
     mlflow.start_run(run_name=f"{model_name}-debiasing")
 
     model, tokenizer = load_peft_model_and_tokenizer(model_name, quantize)
+    model.train()
 
     logger.info("Loading and pre-processing dataset")
     train_dataset, test_dataset = get_train_test_dataset(tokenizer)
 
-    data_collator = DataCollatorForSeq2Seq(
-        tokenizer=tokenizer, model=model, padding=True, label_pad_token_id=-100
+    data_collator = DataCollatorForLanguageModeling(
+        tokenizer=tokenizer, mlm=False, pad_to_multiple_of=8
     )
 
     trainer = Trainer(
@@ -75,9 +76,9 @@ def get_training_args() -> TrainingArguments:
         overwrite_output_dir=True,
         num_train_epochs=3,
         max_steps=100,
-        per_device_train_batch_size=2,
-        per_device_eval_batch_size=2,
-        gradient_accumulation_steps=4,
+        per_device_train_batch_size=4,
+        per_device_eval_batch_size=4,
+        gradient_accumulation_steps=2,
         learning_rate=2e-4,
         weight_decay=0.01,
         warmup_steps=100,

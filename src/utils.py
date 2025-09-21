@@ -4,7 +4,12 @@ from typing import Any
 
 import torch
 from peft import LoraConfig, TaskType, get_peft_model
-from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+from transformers import (
+    AutoConfig,
+    AutoModelForCausalLM,
+    AutoTokenizer,
+    BitsAndBytesConfig,
+)
 
 HF_TOKEN = os.getenv("HF_TOKEN")
 
@@ -42,7 +47,6 @@ def load_peft_model_and_tokenizer(model_name: str, quantize: bool) -> tuple[Any,
 
 def get_model_and_tokenizer(model_name: str, quantize: bool) -> tuple[Any, Any]:
     model = load_model(model_name, quantize)
-    model.eval()
     model.generation_config.top_p = None
     model.generation_config.top_k = None
 
@@ -51,7 +55,7 @@ def get_model_and_tokenizer(model_name: str, quantize: bool) -> tuple[Any, Any]:
 
 
 def load_model(model_name: str, quantize: bool) -> Any:
-    bnb_cfg = (
+    bnb_config = (
         BitsAndBytesConfig(
             load_in_4bit=True,
             bnb_4bit_use_double_quant=True,
@@ -64,12 +68,17 @@ def load_model(model_name: str, quantize: bool) -> Any:
         else None
     )
 
+    # Try passing config as None, investigate tuple exception
+    config = AutoConfig.from_pretrained(model_name, trust_remote_code=True)
+
     model = AutoModelForCausalLM.from_pretrained(
         model_name,
-        quantization_config=bnb_cfg,
+        config=config,
+        quantization_config=bnb_config,
         dtype=torch.float16,
         token=HF_TOKEN,
         device_map="auto",
+        # device_map={"": 0},
         low_cpu_mem_usage=True,
     )
 

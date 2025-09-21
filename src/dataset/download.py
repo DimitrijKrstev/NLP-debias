@@ -3,7 +3,7 @@ from logging import getLogger
 
 from kagglehub import dataset_download
 
-from dataset.constants import DATASET_PATH
+from dataset.constants import DATASET_DOWNLOAD_PATH
 
 logger = getLogger(__name__)
 
@@ -14,11 +14,12 @@ def download_wnc() -> None:
     )
     logger.info(f"Downloaded dataset to {path}")
 
-    new_directory = DATASET_PATH
     try:
-        shutil.move(path, new_directory)
+        shutil.move(path, DATASET_DOWNLOAD_PATH)
+        shutil.move(DATASET_DOWNLOAD_PATH / "1" / "WNC", DATASET_DOWNLOAD_PATH)
+        shutil.rmtree(DATASET_DOWNLOAD_PATH / "1")
     except Exception as e:
-        logger.error(f"Error moving dataset to {new_directory}: {e}")
+        logger.error(f"Error moving dataset to {DATASET_DOWNLOAD_PATH}: {e}")
         raise
 
-    logger.info(f"Moved dataset to {new_directory}")
+    logger.info(f"Moved dataset to {DATASET_DOWNLOAD_PATH}")
