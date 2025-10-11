@@ -5,15 +5,17 @@ from datasets import Dataset
 from pandas import DataFrame, read_csv
 
 from dataset.constants import DATASET_PATH, WNC_COLUMNS, WNCColumn
-from models import WNCData
 
 logger = getLogger(__name__)
 
 
 def get_train_test_dataset(tokenizer: Any) -> tuple[Dataset, Dataset]:
     dataframe = load_wnc_from_csv()
-    rows = preprocess_data(dataframe)
-    train_dataset, test_dataset = split_and_tokenize_rows(rows, tokenizer)
+    dataframe = get_sft_dataset_portion(dataframe)
+    preprocessed_dataframe = preprocess_data(dataframe)
+    train_dataset, test_dataset = split_and_tokenize_rows(
+        preprocessed_dataframe, tokenizer
+    )
 
     logger.info(
         f"Loaded {len(train_dataset)} training examples and {len(test_dataset)} test examples"
@@ -35,7 +37,11 @@ def load_wnc_from_csv() -> DataFrame:
     return read_csv(main_file, delimiter="\t", on_bad_lines="warn", names=WNC_COLUMNS)
 
 
-def preprocess_data(dataframe: DataFrame) -> list[WNCData]:
+def get_sft_dataset_portion(dataframe: DataFrame) -> DataFrame:
+    return dataframe[: int(0.85 * len(dataframe))]
+
+
+def preprocess_data(dataframe: DataFrame) -> DataFrame:
     dataframe.drop(columns=["id", "src_tok", "tgt_tok", "tgt_parse_tags"], inplace=True)
     dataframe = dataframe.rename(
         columns={"src_raw": WNCColumn.BIASED, "tgt_raw": WNCColumn.NEUTRAL}
@@ -43,32 +49,18 @@ def preprocess_data(dataframe: DataFrame) -> list[WNCData]:
 
     dataframe = dataframe.dropna(subset=[WNCColumn.BIASED, WNCColumn.NEUTRAL])
 
-    rows = [
-        WNCData(
-            (
-                "Rewrite the following text to remove bias "
-                + "while preserving the core information:\n\n"
-                + f"Text: {row[WNCColumn.BIASED]}\n\n"
-                + f"Rewritten: {row[WNCColumn.NEUTRAL]}"
-            ),
-            row[WNCColumn.BIASED],
-            row[WNCColumn.NEUTRAL],
-        )
-        for _, row in dataframe.iterrows()
-    ]
-
-    return rows
+    return dataframe
 
 
 def split_and_tokenize_rows(
-    data: list[WNCData], tokenizer: Any
+    dataframe: DataFrame, tokenizer: Any
 ) -> tuple[Dataset, Dataset]:
-    split_idx = int(0.9 * len(data))
-    train_set = data[:split_idx]
-    test_set = data[split_idx:]
+    split_idx = int(0.9 * len(dataframe))
+    train_set = dataframe[:split_idx]
+    test_set = dataframe[split_idx:]
 
-    train_dataset = Dataset.from_list([data.to_dict() for data in train_set])
-    test_dataset = Dataset.from_list([data.to_dict() for data in test_set])
+    train_dataset = Dataset.from_pandas(train_set)
+    test_dataset = Dataset.from_pandas(test_set)
 
     train_dataset = train_dataset.map(
         lambda data: tokenize_data(data, tokenizer),
@@ -84,39 +76,18 @@ def split_and_tokenize_rows(
     return train_dataset, test_dataset
 
 
-def tokenize_data(data: dict, tokenizer: Any) -> dict:
-    batched_inputs = data["model_input_text"]
-    batched_targets = data[WNCColumn.NEUTRAL]
+def tokenize_data(batch: dict, tokenizer: Any) -> dict:
+    biased_texts = batch[WNCColumn.BIASED]
+    neutral_texts = batch[WNCColumn.NEUTRAL]
 
-    results = {
-        "input_ids": [],
-        "attention_mask": [],
-    }
+    concatenated_texts = [f"{b}\n{n}" for b, n in zip(biased_texts, neutral_texts)]
 
-    full_texts = [
-        f"{input_text}\n\nOutput:\n{target_text}{tokenizer.eos_token}"
-        for input_text, target_text in zip(batched_inputs, batched_targets)
-    ]
-
-    tokens_list = [
-        tokenizer(
-            text,
-            truncation=True,
-            max_length=512,
-            padding=False,
-            return_tensors=None,
-        )
-        for text in full_texts
-    ]
-    results["input_ids"] = [tokens["input_ids"] for tokens in tokens_list]
-    results["attention_mask"] = [tokens["attention_mask"] for tokens in tokens_list]
-
-    return results
-
-
-def create_debiasing_prompt(biased_text: str) -> str:
-    return (
-        "Rewrite the following text to remove bias while preserving the core information:\n\n"
-        + f"Text: {biased_text}"
-        + "Rewritten:\n"
+    tokenized = tokenizer(
+        concatenated_texts,
+        truncation=True,
+        max_length=512,
     )
+
+    tokenized["labels"] = tokenized["input_ids"].copy()
+
+    return tokenized

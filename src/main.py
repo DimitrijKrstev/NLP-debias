@@ -31,7 +31,7 @@ def main():
     train_model_parser.add_argument(
         "--model-name",
         type=str,
-        default="Qwen/Qwen3-4B-Instruct-2507",
+        default="Qwen/Qwen3-4B",
         help="Model name",
     )
 

@@ -5,11 +5,13 @@ from typing import Any
 import torch
 from peft import LoraConfig, TaskType, get_peft_model
 from transformers import (
-    AutoConfig,
     AutoModelForCausalLM,
     AutoTokenizer,
     BitsAndBytesConfig,
+    TrainingArguments,
 )
+
+from constants import OUTPUT_DIR
 
 HF_TOKEN = os.getenv("HF_TOKEN")
 
@@ -69,18 +71,23 @@ def load_model(model_name: str, quantize: bool) -> Any:
     )
 
     # Try passing config as None, investigate tuple exception
-    config = AutoConfig.from_pretrained(model_name, trust_remote_code=True)
+    # config = AutoConfig.from_pretrained(model_name, trust_remote_code=True)
+
+    torch.cuda.empty_cache()
 
     model = AutoModelForCausalLM.from_pretrained(
         model_name,
-        config=config,
+        # config=config,
         quantization_config=bnb_config,
-        dtype=torch.float16,
+        torch_dtype=torch.float16,
         token=HF_TOKEN,
         device_map="auto",
-        # device_map={"": 0},
         low_cpu_mem_usage=True,
+        trust_remote_code=True,
     )
+
+    model.gradient_checkpointing_enable()
+    model.config.use_cache = False
 
     return model
 
@@ -92,3 +99,52 @@ def load_tokenizer(model_name: str) -> Any:
         tokenizer.pad_token = tokenizer.eos_token
 
     return tokenizer
+
+
+def get_training_args() -> TrainingArguments:
+    return TrainingArguments(
+        output_dir=OUTPUT_DIR,
+        overwrite_output_dir=True,
+        num_train_epochs=3,
+        max_steps=100,
+        per_device_train_batch_size=4,
+        per_device_eval_batch_size=4,
+        gradient_accumulation_steps=2,
+        learning_rate=2e-4,
+        weight_decay=0.01,
+        warmup_steps=100,
+        logging_steps=50,
+        eval_strategy="steps",
+        eval_steps=200,
+        save_steps=600,
+        save_total_limit=3,
+        load_best_model_at_end=True,
+        metric_for_best_model="eval_loss",
+        greater_is_better=False,
+        fp16=True,
+        dataloader_pin_memory=False,
+        remove_unused_columns=False,
+        report_to=["mlflow"],
+        run_name="qwen3-debiasing",
+    )
+
+
+def debias_text(text: str, model, tokenizer, max_length: int = 512):
+    inputs = tokenizer(
+        text, return_tensors="pt", max_length=max_length, truncation=True
+    ).to(model.device)
+
+    with torch.no_grad():
+        outputs = model.generate(
+            **inputs,
+            max_new_tokens=256,
+            do_sample=True,
+            temperature=0.7,
+            top_p=0.9,
+            pad_token_id=tokenizer.eos_token_id,
+        )
+
+    generated_text = tokenizer.decode(
+        outputs[0][inputs["input_ids"].shape[1] :], skip_special_tokens=True
+    )
+    return generated_text.strip()
