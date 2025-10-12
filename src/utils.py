@@ -49,9 +49,6 @@ def load_peft_model_and_tokenizer(model_name: str, quantize: bool) -> tuple[Any,
 
 def get_model_and_tokenizer(model_name: str, quantize: bool) -> tuple[Any, Any]:
     model = load_model(model_name, quantize)
-    model.generation_config.top_p = None
-    model.generation_config.top_k = None
-
     tokenizer = load_tokenizer(model_name)
     return model, tokenizer
 
@@ -81,7 +78,7 @@ def load_model(model_name: str, quantize: bool) -> Any:
         quantization_config=bnb_config,
         torch_dtype=torch.float16,
         token=HF_TOKEN,
-        device_map="auto",
+        device_map={"": "cuda"},
         low_cpu_mem_usage=True,
         trust_remote_code=True,
     )
@@ -95,6 +92,7 @@ def load_model(model_name: str, quantize: bool) -> Any:
 def load_tokenizer(model_name: str) -> Any:
     tokenizer = AutoTokenizer.from_pretrained(model_name)
 
+    tokenizer.padding_side = "left"
     if tokenizer.pad_token_id is None:
         tokenizer.pad_token = tokenizer.eos_token
 

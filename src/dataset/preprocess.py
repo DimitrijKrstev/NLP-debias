@@ -67,11 +67,6 @@ def split_and_tokenize_rows(
         batched=True,
         remove_columns=train_dataset.column_names,
     )
-    test_dataset = test_dataset.map(
-        lambda data: tokenize_data(data, tokenizer),
-        batched=True,
-        remove_columns=test_dataset.column_names,
-    )
 
     return train_dataset, test_dataset
 

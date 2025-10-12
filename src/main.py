@@ -1,7 +1,9 @@
 import argparse
 from logging import INFO, basicConfig, getLogger
+from pathlib import Path
 
 from dataset.download import download_wnc
+from eval_model import evaluate_model
 from train import train_model
 
 basicConfig(level=INFO)
@@ -35,6 +37,21 @@ def main():
         help="Model name",
     )
 
+    eval_model_parser = subparsers.add_parser("eval-model", help="Evaluate model")
+    eval_model_parser.set_defaults(func=eval_model_command)
+    eval_model_parser.add_argument(
+        "--model-tokenizer-path",
+        type=str,
+        default="./models/output/",
+        help="Path to the trained model and tokenizer",
+    )
+    eval_model_parser.add_argument(
+        "--model-name",
+        type=str,
+        default="Qwen/Qwen3-4B",
+        help="Path to the model name",
+    )
+
     args = parser.parse_args()
     args.func(args)
 
@@ -45,6 +62,11 @@ def download_dataset_command(_):
 
 def train_model_command(args):
     train_model(args.quantize, args.mlflow_experiment, args.model_name)
+
+
+def eval_model_command(args):
+    # evaluate_model(Path(__file__).parent.parent / args.model_tokenizer_path)
+    evaluate_model(Path(args.model_tokenizer_path), args.model_name)
 
 
 if __name__ == "__main__":

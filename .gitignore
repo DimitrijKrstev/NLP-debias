@@ -15,3 +15,4 @@ dataset/WNC/
 dataset/1/
 .env
 mlruns/
+models/
