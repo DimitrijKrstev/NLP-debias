@@ -1,3 +1,4 @@
+import json
 import os
 from logging import getLogger
 from pathlib import Path
@@ -13,7 +14,7 @@ from transformers import (
     TrainingArguments,
 )
 
-from constants import TRAIN_OUTPUT_DIR
+from constants import JUDGE_CACHE_FILE, TRAIN_TRAIN_OUTPUT_DIR
 
 HF_TOKEN = os.getenv("HF_TOKEN")
 
@@ -124,6 +125,55 @@ def get_training_args() -> TrainingArguments:
         remove_unused_columns=False,
         report_to=["mlflow"],
         run_name="qwen3-debiasing",
-        dataloader_num_workers=2,
-        fp16=True,
+        dataloader_num_workers=4,
+        gradient_checkpointing=True,
     )
+
+
+def debias_text(text: str, model, tokenizer, max_length: int = 512):
+    inputs = tokenizer(
+        [f"{b}\n" for b in text],
+        return_tensors="pt",
+        padding=True,
+        truncation=True,
+        max_length=max_length,
+    ).to(model.device)
+
+    with torch.no_grad():
+        outputs = model.generate(
+            **inputs,
+            max_new_tokens=32,
+            do_sample=False,
+            temperature=0.0,
+            pad_token_id=tokenizer.eos_token_id,
+        )
+
+    decoded_outputs = tokenizer.batch_decode(outputs, skip_special_tokens=True)
+
+    predicted_texts = [
+        d[len(b) :].strip() if d.startswith(b) else d.strip()
+        for d, b in zip(decoded_outputs, text)
+    ]
+
+    return predicted_texts
+
+
+def load_cache():
+    if JUDGE_CACHE_FILE.exists():
+        cache = {}
+        with JUDGE_CACHE_FILE.open("r", encoding="utf-8") as f:
+            for line in f:
+                entry = json.loads(line)
+                key = entry["key"]
+                cache[key] = entry
+        return cache
+    return {}
+
+
+def save_to_cache(entry):
+    with JUDGE_CACHE_FILE.open("a", encoding="utf-8") as f:
+        f.write(json.dumps(entry) + "\n")
+
+
+def make_cache_key(biased, prediction, neutral_ref):
+    return f"{hash((biased, prediction, neutral_ref))}"
