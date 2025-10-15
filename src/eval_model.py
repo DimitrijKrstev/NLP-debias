@@ -2,7 +2,6 @@ from logging import getLogger
 from pathlib import Path
 
 import pandas as pd
-import torch
 from evaluate import load as evaluate_load
 from peft import PeftModel
 from sentence_transformers import SentenceTransformer, util
@@ -12,7 +11,7 @@ from tqdm import tqdm
 from constants import SFT_RL_CUTOFF
 from dataset.constants import WNCColumn
 from dataset.preprocess import get_test_dataset, load_wnc_from_csv
-from utils import load_model, load_tokenizer
+from utils import debias_text, load_model, load_tokenizer
 
 logger = getLogger(__name__)
 
@@ -47,29 +46,7 @@ def evaluate_model(model_tokenizer_path: Path, model_name: str) -> dict:
         biased_texts = batch[WNCColumn.BIASED]
         neutral_texts = batch[WNCColumn.NEUTRAL]
 
-        inputs = tokenizer(
-            [f"{b}\n" for b in biased_texts],
-            return_tensors="pt",
-            padding=True,
-            truncation=True,
-            max_length=512,
-        ).to(model.device)
-
-        with torch.no_grad(), torch.cuda.amp.autocast():
-            outputs = model.generate(
-                **inputs,
-                max_new_tokens=40,
-                do_sample=False,
-                temperature=0.0,
-                pad_token_id=tokenizer.pad_token_id,
-            )
-
-        decoded = tokenizer.batch_decode(outputs, skip_special_tokens=True)
-
-        predicted_texts = [
-            d[len(b) :].strip() if d.startswith(b) else d.strip()
-            for d, b in zip(decoded, biased_texts)
-        ]
+        predicted_texts = debias_text(biased_texts, model, tokenizer)
 
         predictions.extend(predicted_texts)
         references.extend(neutral_texts)

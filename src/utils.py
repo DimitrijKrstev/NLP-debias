@@ -1,3 +1,4 @@
+import json
 import os
 from logging import getLogger
 from pathlib import Path
@@ -13,7 +14,7 @@ from transformers import (
     TrainingArguments,
 )
 
-from constants import TRAIN_OUTPUT_DIR
+from constants import JUDGE_CACHE_FILE, TRAIN_TRAIN_OUTPUT_DIR
 
 HF_TOKEN = os.getenv("HF_TOKEN")
 
@@ -77,7 +78,7 @@ def load_model(model_name: str | Path, quantize: bool) -> Any:
         model_name,
         config=config,
         quantization_config=bnb_config,
-        torch_dtype=torch.float16,
+        dtype=torch.float16,
         token=HF_TOKEN,
         device_map="auto",
         low_cpu_mem_usage=True,
@@ -131,16 +132,19 @@ def get_training_args() -> TrainingArguments:
 
 def debias_text(text: str, model, tokenizer, max_length: int = 512):
     inputs = tokenizer(
-        text, return_tensors="pt", max_length=max_length, truncation=True
+        [f"{b}\n" for b in text],
+        return_tensors="pt",
+        padding=True,
+        truncation=True,
+        max_length=max_length,
     ).to(model.device)
 
     with torch.no_grad():
         outputs = model.generate(
             **inputs,
-            max_new_tokens=256,
-            do_sample=True,
-            temperature=0.7,
-            top_p=0.9,
+            max_new_tokens=32,
+            do_sample=False,
+            temperature=0.0,
             pad_token_id=tokenizer.eos_token_id,
         )
 
@@ -152,3 +156,24 @@ def debias_text(text: str, model, tokenizer, max_length: int = 512):
     ]
 
     return predicted_texts
+
+
+def load_cache():
+    if JUDGE_CACHE_FILE.exists():
+        cache = {}
+        with JUDGE_CACHE_FILE.open("r", encoding="utf-8") as f:
+            for line in f:
+                entry = json.loads(line)
+                key = entry["key"]
+                cache[key] = entry
+        return cache
+    return {}
+
+
+def save_to_cache(entry):
+    with JUDGE_CACHE_FILE.open("a", encoding="utf-8") as f:
+        f.write(json.dumps(entry) + "\n")
+
+
+def make_cache_key(biased, prediction, neutral_ref):
+    return f"{hash((biased, prediction, neutral_ref))}"
