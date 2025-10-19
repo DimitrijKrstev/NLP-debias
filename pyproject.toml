@@ -26,4 +26,6 @@ dependencies = [
     "sentence-transformers>=5.1.1",
     "nltk>=3.9.2",
     "rouge-score>=0.1.2",
+    "openai>=2.3.0",
+    "typer>=0.19.2",
 ]
