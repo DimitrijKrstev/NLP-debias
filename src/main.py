@@ -4,7 +4,7 @@ from pathlib import Path
 import typer
 
 from dataset.download import download_wnc
-from eval_model import evaluate_model
+from evaluation.eval_model import evaluate_model
 from train import train_model
 
 app = typer.Typer()
