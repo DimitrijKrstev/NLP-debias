@@ -1,17 +1,19 @@
 import os
 from logging import getLogger
+from pathlib import Path
 from typing import Any
 
 import torch
-from peft import LoraConfig, TaskType, get_peft_model
+from peft import LoraConfig, TaskType, get_peft_model, prepare_model_for_kbit_training
 from transformers import (
+    AutoConfig,
     AutoModelForCausalLM,
     AutoTokenizer,
     BitsAndBytesConfig,
     TrainingArguments,
 )
 
-from constants import OUTPUT_DIR
+from constants import TRAIN_OUTPUT_DIR
 
 HF_TOKEN = os.getenv("HF_TOKEN")
 
@@ -22,7 +24,12 @@ logger = getLogger(__name__)
 def load_peft_model_and_tokenizer(model_name: str, quantize: bool) -> tuple[Any, Any]:
     logger.info(f"Loading model: {model_name}")
 
-    model, tokenizer = get_model_and_tokenizer(model_name, quantize)
+    model = load_model(model_name, quantize)
+    tokenizer = load_tokenizer(model_name)
+
+    if quantize:
+        logger.info("Preparing model for k-bit training")
+        model = prepare_model_for_kbit_training(model)
 
     logger.info("Applying LoRA configuration")
     lora_config = LoraConfig(
@@ -47,13 +54,7 @@ def load_peft_model_and_tokenizer(model_name: str, quantize: bool) -> tuple[Any,
     return model, tokenizer
 
 
-def get_model_and_tokenizer(model_name: str, quantize: bool) -> tuple[Any, Any]:
-    model = load_model(model_name, quantize)
-    tokenizer = load_tokenizer(model_name)
-    return model, tokenizer
-
-
-def load_model(model_name: str, quantize: bool) -> Any:
+def load_model(model_name: str | Path, quantize: bool) -> Any:
     bnb_config = (
         BitsAndBytesConfig(
             load_in_4bit=True,
@@ -68,31 +69,32 @@ def load_model(model_name: str, quantize: bool) -> Any:
     )
 
     # Try passing config as None, investigate tuple exception
-    # config = AutoConfig.from_pretrained(model_name, trust_remote_code=True)
+    config = AutoConfig.from_pretrained(model_name, trust_remote_code=True)
 
     torch.cuda.empty_cache()
 
     model = AutoModelForCausalLM.from_pretrained(
         model_name,
-        # config=config,
+        config=config,
         quantization_config=bnb_config,
         torch_dtype=torch.float16,
         token=HF_TOKEN,
-        device_map={"": "cuda"},
+        device_map="auto",
         low_cpu_mem_usage=True,
         trust_remote_code=True,
     )
 
-    model.gradient_checkpointing_enable()
+    model.gradient_checkpointing_enable(
+        gradient_checkpointing_kwargs={"use_reentrant": False}
+    )
     model.config.use_cache = False
 
     return model
 
 
-def load_tokenizer(model_name: str) -> Any:
+def load_tokenizer(model_name: str | Path) -> Any:
     tokenizer = AutoTokenizer.from_pretrained(model_name)
 
-    tokenizer.padding_side = "left"
     if tokenizer.pad_token_id is None:
         tokenizer.pad_token = tokenizer.eos_token
 
@@ -101,29 +103,29 @@ def load_tokenizer(model_name: str) -> Any:
 
 def get_training_args() -> TrainingArguments:
     return TrainingArguments(
-        output_dir=OUTPUT_DIR,
+        output_dir=TRAIN_OUTPUT_DIR,
         overwrite_output_dir=True,
         num_train_epochs=3,
-        max_steps=100,
         per_device_train_batch_size=4,
-        per_device_eval_batch_size=4,
+        per_device_eval_batch_size=8,
         gradient_accumulation_steps=2,
-        learning_rate=2e-4,
+        learning_rate=1e-4,
+        warmup_ratio=0.03,
         weight_decay=0.01,
-        warmup_steps=100,
         logging_steps=50,
         eval_strategy="steps",
-        eval_steps=200,
-        save_steps=600,
+        eval_steps=5000,
+        save_steps=5000,
         save_total_limit=3,
         load_best_model_at_end=True,
         metric_for_best_model="eval_loss",
         greater_is_better=False,
-        fp16=True,
-        dataloader_pin_memory=False,
+        dataloader_pin_memory=True,
         remove_unused_columns=False,
         report_to=["mlflow"],
         run_name="qwen3-debiasing",
+        dataloader_num_workers=4,
+        gradient_checkpointing=True,
     )
 
 
@@ -142,7 +144,11 @@ def debias_text(text: str, model, tokenizer, max_length: int = 512):
             pad_token_id=tokenizer.eos_token_id,
         )
 
-    generated_text = tokenizer.decode(
-        outputs[0][inputs["input_ids"].shape[1] :], skip_special_tokens=True
-    )
-    return generated_text.strip()
+    decoded_outputs = tokenizer.batch_decode(outputs, skip_special_tokens=True)
+
+    predicted_texts = [
+        d[len(b) :].strip() if d.startswith(b) else d.strip()
+        for d, b in zip(decoded_outputs, text)
+    ]
+
+    return predicted_texts

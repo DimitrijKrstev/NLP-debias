@@ -1,18 +1,17 @@
 from logging import getLogger
 from pathlib import Path
-import torch
-import nltk
-import pandas as pd
 
+import pandas as pd
+import torch
 from evaluate import load as evaluate_load
 from peft import PeftModel
 from sentence_transformers import SentenceTransformer, util
-from tqdm import tqdm
-from transformers import AutoTokenizer
 from torch.utils.data import DataLoader
+from tqdm import tqdm
 
+from constants import SFT_RL_CUTOFF
 from dataset.constants import WNCColumn
-from dataset.preprocess import get_train_test_dataset
+from dataset.preprocess import get_test_dataset, load_wnc_from_csv
 from utils import load_model, load_tokenizer
 
 logger = getLogger(__name__)
@@ -31,9 +30,9 @@ def evaluate_model(model_tokenizer_path: Path, model_name: str) -> dict:
     model.eval()
 
     logger.info("Loading test dataset...")
-    _, test_dataset = get_train_test_dataset(tokenizer)
-    subset_size = min(1000, len(test_dataset))
-    test_dataset = test_dataset.select(range(subset_size))
+    dataset = load_wnc_from_csv()
+    dataset = dataset[: int(SFT_RL_CUTOFF * len(dataset))]
+    test_dataset = get_test_dataset(tokenizer)
 
     predictions = []
     references = []
