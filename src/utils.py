@@ -14,7 +14,7 @@ from transformers import (
     TrainingArguments,
 )
 
-from constants import JUDGE_CACHE_FILE, TRAIN_TRAIN_OUTPUT_DIR
+from constants import JUDGE_CACHE_FILE, TRAIN_OUTPUT_DIR
 
 HF_TOKEN = os.getenv("HF_TOKEN")
 
@@ -125,8 +125,8 @@ def get_training_args() -> TrainingArguments:
         remove_unused_columns=False,
         report_to=["mlflow"],
         run_name="qwen3-debiasing",
-        dataloader_num_workers=4,
-        gradient_checkpointing=True,
+        dataloader_num_workers=2,
+        fp16=True,
     )
 
 

@@ -12,7 +12,7 @@ logger = getLogger(__name__)
 # TODO make generic
 def get_train_dataset(tokenizer: Any) -> Dataset:
     dataset = load_wnc_from_csv()
-    dataset = dataset[:3000]
+    dataset = dataset[-3000:]
 
     train_idx = int(0.8 * len(dataset))
 
