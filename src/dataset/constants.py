@@ -16,6 +16,8 @@ WNC_COLUMNS = [
     "tgt_parse_tags",
 ]
 
+INSTRUCTION_PROMPT = "You are an expert at text style transfer. Your task is to transform text from biased to neutral."
+
 
 class WNCColumn(StrEnum):
     BIASED = "biased"

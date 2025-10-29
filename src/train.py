@@ -1,4 +1,5 @@
 import logging
+from os import environ
 
 import mlflow
 from transformers import DataCollatorForLanguageModeling, Trainer
@@ -7,6 +8,8 @@ from constants import TRAIN_OUTPUT_DIR
 from dataset.preprocess import get_train_val_split
 from utils import get_training_args, load_peft_model_and_tokenizer
 
+environ["TOKENIZERS_PARALLELISM"] = "false"
+
 logger = logging.getLogger(__name__)
 
 
@@ -14,7 +17,7 @@ def train_model(
     quantize: bool,
     mlflow_experiment: str,
     model_name: str,
-):
+) -> None:
     mlflow.set_experiment(mlflow_experiment)
     mlflow.start_run(run_name=f"{model_name}-debiasing")
 
@@ -22,7 +25,7 @@ def train_model(
     model.train()
 
     logger.info("Loading and pre-processing dataset")
-    train_dataset, val_dataset = get_train_val_split(tokenizer, True)
+    train_dataset, val_dataset = get_train_val_split(tokenizer)
     data_collator = DataCollatorForLanguageModeling(
         tokenizer=tokenizer,
         mlm=False,

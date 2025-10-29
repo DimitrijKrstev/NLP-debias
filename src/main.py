@@ -1,5 +1,4 @@
 from logging import INFO, basicConfig, getLogger
-from pathlib import Path
 
 import typer
 
@@ -32,11 +31,11 @@ def sft_train_model(
 
 @app.command()
 def eval_model(
-    model_tokenizer_path: str = "./models/output/",
+    model_tokenizer_path: str = "output/",
     model_name: str = "Qwen/Qwen3-4B",
 ) -> None:
     logger.info(f"Evaluating model: {model_name}")
-    evaluate_model(Path(model_tokenizer_path), model_name)
+    evaluate_model(model_tokenizer_path, model_name)
 
 
 if __name__ == "__main__":

@@ -2,70 +2,64 @@ from logging import getLogger
 from pathlib import Path
 
 import pandas as pd
-import torch
 from peft import PeftModel
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from dataset.constants import WNCColumn
 from dataset.preprocess import get_test_dataset
+from evaluation.utils import (
+    clean_output,
+    compute_metrics,
+    debias_text,
+    make_chat_prompt,
+)
 from utils import load_model, load_tokenizer
-from evaluation.utils import compute_metrics
 
 logger = getLogger(__name__)
 
 
-def evaluate_model(model_tokenizer_path: Path, model_name: str, quantize: bool) -> dict:
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
+def evaluate_model(model_tokenizer_path: Path, model_name: str) -> dict:
+    logger.info(f"Loading tokenizer from {model_tokenizer_path}")
     tokenizer = load_tokenizer(model_tokenizer_path)
-    base_model = load_model(model_name, quantize)
 
-    model = PeftModel.from_pretrained(base_model, model_tokenizer_path).to(device)
+    logger.info("Loading base model...")
+    base_model = load_model(model_name, True)
+
+    logger.info(f"Loading LoRA adapter from {model_tokenizer_path}")
+    model = PeftModel.from_pretrained(base_model, model_tokenizer_path)
+
     model.eval()
 
-    logger.info("Loading and pre-processing dataset")
+    logger.info("Loading test dataset...")
     test_dataset = get_test_dataset(tokenizer)
-    loader = DataLoader(test_dataset, batch_size=16)
 
-    predictions, references, biased = [], [], []
+    predictions = []
+    references = []
+    biased_list = []
+
+    logger.info(f"Evaluating on {len(test_dataset)} examples...")
+
+    batch_size = 16
+    loader = DataLoader(test_dataset, batch_size=batch_size)
 
     for batch in tqdm(loader):
         biased_texts = batch[WNCColumn.BIASED]
         neutral_texts = batch[WNCColumn.NEUTRAL]
 
-        input_ids = biased["input_ids"].to(device)
-        attention_mask = biased["attention_mask"].to(device)
+        prompts = [make_chat_prompt(text) for text in biased_texts]
+        predicted_texts = debias_text(prompts, model, tokenizer)
 
-        with torch.no_grad(), torch.cuda.amp.autocast("cuda"):
-            outputs = model.generate(
-                input_ids=input_ids,
-                attention_mask=attention_mask,
-                max_new_tokens=40,
-                do_sample=False,
-                pad_token_id=tokenizer.pad_token_id,
-            )
-
-        decoded_predicted = tokenizer.batch_decode(outputs, skip_special_tokens=True)
-        decoded_biased = tokenizer.batch_decode(
-            biased_texts["input_ids"], skip_special_tokens=True
-        )
-        decoded_neutral = tokenizer.batch_decode(
-            neutral_texts["input_ids"], skip_special_tokens=True
-        )
-
-        predicted_texts = [
-            d[len(b) :].strip() if d.startswith(b) else d.strip()
-            for d, b in zip(decoded_predicted, decoded_biased)
-        ]
+        predicted_texts = [clean_output(t) for t in predicted_texts]
 
         predictions.extend(predicted_texts)
-        references.extend(decoded_neutral)
-        biased.extend(decoded_biased)
+        references.extend(neutral_texts)
+        biased_list.extend(biased_texts)
 
     df = pd.DataFrame(
-        {"biased": biased, "neutral_ref": references, "predicted": predictions}
+        {"biased": biased_list, "neutral_ref": references, "predicted": predictions}
     )
+
     df.to_csv("wnc_predictions.csv", index=False)
 
     results = compute_metrics(predictions, references)
