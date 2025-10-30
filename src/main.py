@@ -8,7 +8,7 @@ from judge.main import run_rlhf_training
 from judge.utils import get_judge_score
 from train import train_model
 
-app = typer.Typer(pretty_exceptions_enable=False)
+app = typer.Typer()
 
 basicConfig(level=INFO)
 logger = getLogger(__name__)
