@@ -42,7 +42,6 @@ def eval_model(
 
 @app.command()
 def train_rl_model(
-    model_tokenizer_path: str = "./models/output2",
     model_name: str = "Qwen/Qwen3-4B",
     open_ai_remote_model_name: str = "gpt-oss-120b",
     mflow_experiment: str = "RL-NLP-Debias",
@@ -50,7 +49,6 @@ def train_rl_model(
 ) -> None:
     run_rlhf_training(
         model_name,
-        model_tokenizer_path,
         open_ai_remote_model_name,
         mflow_experiment,
         quantize,

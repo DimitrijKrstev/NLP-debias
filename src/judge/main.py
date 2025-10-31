@@ -15,27 +15,24 @@ logger = getLogger(__name__)
 
 def run_rlhf_training(
     model_name: str,
-    training_model_and_tokenizer: str,
     open_ai_remote_model_name: str,
     mlflow_experiment: str,
     quantize: bool,
 ) -> None:
     mlflow.set_experiment(mlflow_experiment)
-    mlflow.start_run(run_name=f"{training_model_and_tokenizer}-rlhf-debiasing")
+    mlflow.start_run(run_name=f"{model_name}-rlhf-debiasing")
+
+    tokenizer = load_tokenizer(model_name)
 
     base_model = load_model(model_name, quantize)
-    tokenizer = load_tokenizer(training_model_and_tokenizer)
+    model = AutoModelForCausalLMWithValueHead.from_pretrained(base_model)
 
-    model = PeftModel.from_pretrained(base_model, training_model_and_tokenizer)
-    model = AutoModelForCausalLMWithValueHead.from_pretrained(model)
-
-    reference_base = load_model(model_name, quantize)
-    reference_model = PeftModel.from_pretrained(
-        reference_base, training_model_and_tokenizer
+    reference_model = AutoModelForCausalLM.from_pretrained(
+        load_model(model_name, quantize)
     )
     reference_model.eval()
-
-    value_model = load_model(model_name, quantize)
+    for param in reference_model.parameters():
+        param.requires_grad = False
 
     dataset = get_train_dataset(tokenizer)
     data_collator = DataCollatorWithPadding(tokenizer=tokenizer, padding=True)
@@ -43,10 +40,14 @@ def run_rlhf_training(
     reward_model = LLMJudgeRewardModel(
         get_judge_score, open_ai_remote_model_name, tokenizer, dataset
     )
+    value_model = model
 
     ppo_config = PPOConfig(
-        exp_name=f"{training_model_and_tokenizer}-rlhf",
+        exp_name=f"{model_name}-rlhf",
+        batch_size=8,
+        mini_batch_size=4,
         num_ppo_epochs=4,
+        learning_rate=1e-5,
         kl_coef=0.05,
         cliprange=0.2,
         vf_coef=0.1,

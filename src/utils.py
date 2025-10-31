@@ -130,34 +130,6 @@ def get_training_args() -> TrainingArguments:
     )
 
 
-def debias_text(text: str, model, tokenizer, max_length: int = 512):
-    inputs = tokenizer(
-        [f"{b}\n" for b in text],
-        return_tensors="pt",
-        padding=True,
-        truncation=True,
-        max_length=max_length,
-    ).to(model.device)
-
-    with torch.no_grad():
-        outputs = model.generate(
-            **inputs,
-            max_new_tokens=32,
-            do_sample=False,
-            temperature=0.0,
-            pad_token_id=tokenizer.eos_token_id,
-        )
-
-    decoded_outputs = tokenizer.batch_decode(outputs, skip_special_tokens=True)
-
-    predicted_texts = [
-        d[len(b) :].strip() if d.startswith(b) else d.strip()
-        for d, b in zip(decoded_outputs, text)
-    ]
-
-    return predicted_texts
-
-
 def load_cache():
     if JUDGE_CACHE_FILE.exists():
         cache = {}

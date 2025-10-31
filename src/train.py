@@ -32,23 +32,6 @@ def train_model(
         pad_to_multiple_of=8,
     )
 
-    logger.info("Checking first training example...")
-    first_example = train_dataset[0]
-    input_ids = first_example["input_ids"]
-    labels = first_example["labels"]
-
-    decoded_input = tokenizer.decode(input_ids, skip_special_tokens=False)
-    decoded_labels = []
-    for idx, (inp, lab) in enumerate(zip(input_ids, labels)):
-        if lab != -100:
-            decoded_labels.append(tokenizer.decode([lab]))
-        else:
-            decoded_labels.append("[MASK]")
-
-    logger.info(f"Full input: {decoded_input}")
-    logger.info(f"Labels (first 50): {' '.join(decoded_labels[:50])}")
-    logger.info(f"Number of trainable tokens: {sum(1 for l in labels if l != -100)}")
-
     trainer = Trainer(
         model=model,
         args=get_training_args(),

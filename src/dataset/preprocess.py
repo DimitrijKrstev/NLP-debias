@@ -9,75 +9,68 @@ from dataset.constants import DATASET_PATH, TRAINING_PROMPT, WNC_COLUMNS, WNCCol
 logger = getLogger(__name__)
 
 
-# TODO make generic
-def get_train_dataset(tokenizer: Any) -> Dataset:
+def get_dataset_slice(
+    tokenizer: Any,
+    start_idx: int | None = None,
+    end_idx: int | None = None,
+    max_samples: int | None = None,
+    remove_columns: bool = False,
+) -> Dataset:
+
     dataset = load_wnc_from_csv()
-    dataset = dataset[:3000]
 
-    train_idx = int(0.8 * len(dataset))
+    if max_samples is not None:
+        dataset = dataset.iloc[:max_samples]
 
-    train_set = dataset[:train_idx].copy()
-    preprocessed_train_set = preprocess_data(train_set)
-    train_dataset = Dataset.from_pandas(preprocessed_train_set)
+    if start_idx is not None or end_idx is not None:
+        dataset = dataset.iloc[start_idx:end_idx]
 
-    tokenized_train_dataset = train_dataset.map(
-        lambda data: tokenize_data(data, tokenizer), batched=True
+    preprocessed_dataframe = preprocess_data(dataset)
+    processed_dataset = Dataset.from_pandas(preprocessed_dataframe)
+
+    tokenize_fn = lambda data: tokenize_data(data, tokenizer)
+
+    tokenized_dataset = processed_dataset.map(
+        tokenize_fn,
+        batched=True,
+        remove_columns=processed_dataset.column_names if remove_columns else None,
     )
 
-    logger.info(f"Loaded {len(train_dataset)} training examples")
+    logger.info(f"Loaded {len(processed_dataset)} examples")
 
-    return tokenized_train_dataset
+    return tokenized_dataset
+
+
+def get_train_dataset(tokenizer: Any) -> Dataset:
+    train_idx = int(0.8 * 3000)
+
+    return get_dataset_slice(tokenizer, start_idx=0, end_idx=train_idx)
 
 
 def get_test_dataset(tokenizer: Any) -> Dataset:
-    dataset = load_wnc_from_csv()
-    dataset = dataset[-1000:]
-
-    preprocessed_dataframe = preprocess_data(dataset)
-
-    test_dataset = Dataset.from_pandas(preprocessed_dataframe)
-
-    test_dataset = test_dataset.map(
-        lambda data: tokenize_data(data, tokenizer), batched=True
-    )
-
-    logger.info(f"Loaded {len(test_dataset)} test examples")
-
-    return test_dataset
+    return get_dataset_slice(tokenizer, start_idx=-1000, end_idx=None)
 
 
 def get_train_val_split(tokenizer: Any) -> tuple[Dataset, Dataset]:
-    dataset = load_wnc_from_csv()
-    dataset = dataset[:3000]
+    train_idx = int(0.8 * 3000)
+    val_idx = int(0.9 * 3000)
 
-    train_idx = int(0.8 * len(dataset))
-    val_idx = int(0.9 * len(dataset))
-
-    train_set = dataset[:train_idx].copy()
-    val_set = dataset[train_idx:val_idx].copy()
-
-    preprocessed_train_set = preprocess_data(train_set)
-    preprocessed_val_set = preprocess_data(val_set)
-
-    train_dataset = Dataset.from_pandas(preprocessed_train_set)
-    val_dataset = Dataset.from_pandas(preprocessed_val_set)
-
-    tokenized_train_dataset = train_dataset.map(
-        lambda data: tokenize_data(data, tokenizer),
-        batched=True,
-        remove_columns=train_dataset.column_names,
+    train_dataset = get_dataset_slice(
+        tokenizer, start_idx=0, end_idx=train_idx, max_samples=3000, remove_columns=True
     )
-    tokenized_val_dataset = val_dataset.map(
-        lambda data: tokenize_data(data, tokenizer),
-        batched=True,
-        remove_columns=val_dataset.column_names,
+    val_dataset = get_dataset_slice(
+        tokenizer,
+        start_idx=train_idx,
+        end_idx=val_idx,
+        max_samples=3000,
+        remove_columns=True,
     )
 
     logger.info(
         f"Loaded {len(train_dataset)} training examples and {len(val_dataset)} validation examples"
     )
 
-    return tokenized_train_dataset, tokenized_val_dataset
+    return train_dataset, val_dataset
 
 
 def load_wnc_from_csv() -> DataFrame:
@@ -108,67 +101,48 @@ def tokenize_data(batch: dict, tokenizer: Any) -> dict:
     biased_texts = batch[WNCColumn.BIASED]
     neutral_texts = batch[WNCColumn.NEUTRAL]
 
-    all_input_ids = []
-    all_labels = []
-    all_attention_masks = []
-
-    for biased_text, neutral_text in zip(biased_texts, neutral_texts):
-        messages = [
-            {
-                "role": "user",
-                "content": f"{TRAINING_PROMPT}:\nBiased text: {biased_text}",
-            },
-            {"role": "assistant", "content": neutral_text},
+    messages = [
+        [
+            {"role": "user", "content": f"{TRAINING_PROMPT}:\nBiased text: {b}"},
+            {"role": "assistant", "content": n},
         ]
+        for b, n in zip(biased_texts, neutral_texts)
+    ]
 
-        input_ids = tokenizer.apply_chat_template(
-            messages,
-            tokenize=True,
-            add_generation_prompt=False,
-            return_tensors=None,
-            max_length=256,
-            padding="max_length",
-            truncation=True,
+    input_ids = tokenizer.apply_chat_template(
+        messages,
+        tokenize=True,
+        add_generation_prompt=False,
+        max_length=256,
+        padding="max_length",
+        truncation=True,
+    )
+
+    user_only = tokenizer.apply_chat_template(
+        [
+            [{"role": "user", "content": f"{TRAINING_PROMPT}:\nBiased text: {b}"}]
+            for b in biased_texts
+        ],
+        tokenize=True,
+        add_generation_prompt=True,
+        max_length=256,
+        padding="max_length",
+        truncation=True,
+    )
+
+    labels = []
+    for i in range(len(input_ids)):
+        label = input_ids[i].copy()
+        user_length = sum(
+            1 for token in user_only[i] if token != tokenizer.pad_token_id
         )
-
-        user_only = tokenizer.apply_chat_template(
-            [messages[0]],
-            tokenize=True,
-            add_generation_prompt=True,
-            return_tensors=None,
-            max_length=256,
-            padding="max_length",
-            truncation=True,
-        )
-
-        labels = input_ids.copy()
-        labels[: len(user_only)] = [-100] * len(user_only)
-
-        attention_mask = [1] * len(input_ids)
-
-        all_input_ids.append(input_ids)
-        all_labels.append(labels)
-        all_attention_masks.append(attention_mask)
+        label[:user_length] = [-100] * user_length
+        labels.append(label)
 
     return {
-        "input_ids": all_input_ids,
-        "labels": all_labels,
-        "attention_mask": all_attention_masks,
+        "input_ids": input_ids,
+        "labels": labels,
+        "attention_mask": [[1] * len(ids) for ids in input_ids],
+        "biased_text": batch[WNCColumn.BIASED],
+        "neutral_text": batch[WNCColumn.NEUTRAL],
     }
-
-
-# def tokenize_test_data(batch: dict, tokenizer: Any) -> dict:
-#     biased_text = batch[WNCColumn.BIASED]
-#     neutral_text = batch[WNCColumn.NEUTRAL]
-
-#     tokenized = tokenizer(
-#         biased_text,
-#         truncation=True,
-#         max_length=256,
-#         padding=False,
-#         return_attention_mask=True,
-#     )
-
-#     tokenized["reference_neutral"] = neutral_text
-
-#     return tokenized
