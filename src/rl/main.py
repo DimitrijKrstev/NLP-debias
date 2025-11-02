@@ -1,14 +1,15 @@
 from logging import getLogger
+
 import mlflow
-from peft import PeftModel
 from transformers import DataCollatorWithPadding
-from trl.trainer.ppo_trainer import PPOTrainer
-from trl.trainer.ppo_config import PPOConfig
 from trl.models.modeling_value_head import AutoModelForCausalLMWithValueHead
+from trl.trainer.ppo_config import PPOConfig
+from trl.trainer.ppo_trainer import PPOTrainer
+
 from dataset.preprocess import get_train_dataset
-from judge.llm_judge import LLMJudgeRewardModel
+from rl.llm_judge import LLMJudgeRewardModel
+from rl.utils import get_judge_score
 from utils import load_model, load_tokenizer
-from judge.utils import get_judge_score
 
 logger = getLogger(__name__)
 
@@ -24,28 +25,31 @@ def run_rlhf_training(
 
     tokenizer = load_tokenizer(model_name)
 
-    base_model = load_model(model_name, quantize)
-    model = AutoModelForCausalLMWithValueHead.from_pretrained(base_model)
-
-    reference_model = AutoModelForCausalLM.from_pretrained(
-        load_model(model_name, quantize)
-    )
-    reference_model.eval()
-    for param in reference_model.parameters():
-        param.requires_grad = False
-
     dataset = get_train_dataset(tokenizer)
     data_collator = DataCollatorWithPadding(tokenizer=tokenizer, padding=True)
+
+    base_model = load_model(model_name, quantize)
+    model = AutoModelForCausalLMWithValueHead(base_model)
+    model.generation_config = base_model.generation_config
+    model.is_gradient_checkpointing = getattr(
+        base_model, "is_gradient_checkpointing", False
+    )
+    model.train()
+
+    reference_model = load_model(model_name, quantize)
+    reference_model.eval()
+
+    value_model = load_model(model_name, quantize)
+    value_model.eval()
 
     reward_model = LLMJudgeRewardModel(
         get_judge_score, open_ai_remote_model_name, tokenizer, dataset
     )
-    value_model = model
 
     ppo_config = PPOConfig(
         exp_name=f"{model_name}-rlhf",
-        batch_size=8,
-        mini_batch_size=4,
+        per_device_train_batch_size=4,
+        num_mini_batches=2,
         num_ppo_epochs=4,
         learning_rate=1e-5,
         kl_coef=0.05,
@@ -64,7 +68,7 @@ def run_rlhf_training(
         ref_model=reference_model,
         reward_model=reward_model,
         value_model=value_model,
-        train_dataset=dataset,
+        train_dataset=dataset.remove_columns(["biased_text", "neutral_text"]),
         data_collator=data_collator,
     )
 

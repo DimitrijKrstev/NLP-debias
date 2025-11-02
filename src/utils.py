@@ -14,7 +14,7 @@ from transformers import (
     TrainingArguments,
 )
 
-from constants import JUDGE_CACHE_FILE, TRAIN_OUTPUT_DIR
+from constants import RL_CACHE_FILE, TRAIN_OUTPUT_DIR
 
 HF_TOKEN = os.getenv("HF_TOKEN")
 
@@ -22,11 +22,10 @@ HF_TOKEN = os.getenv("HF_TOKEN")
 logger = getLogger(__name__)
 
 
-def load_peft_model_and_tokenizer(model_name: str, quantize: bool) -> tuple[Any, Any]:
+def load_peft_model(model_name: str, quantize: bool) -> Any:
     logger.info(f"Loading model: {model_name}")
 
     model = load_model(model_name, quantize)
-    tokenizer = load_tokenizer(model_name)
 
     if quantize:
         logger.info("Preparing model for k-bit training")
@@ -52,10 +51,10 @@ def load_peft_model_and_tokenizer(model_name: str, quantize: bool) -> tuple[Any,
     model = get_peft_model(model, lora_config)
     model.print_trainable_parameters()
 
-    return model, tokenizer
+    return model
 
 
-def load_model(model_name: str | Path, quantize: bool) -> Any:
+def load_model(model_name: str | Path, quantize: bool, is_rl: bool = False) -> Any:
     bnb_config = (
         BitsAndBytesConfig(
             # load_in_4bit=True,
@@ -71,9 +70,7 @@ def load_model(model_name: str | Path, quantize: bool) -> Any:
 
     # Try passing config as None, investigate tuple exception
     config = AutoConfig.from_pretrained(model_name, trust_remote_code=True)
-
     torch.cuda.empty_cache()
-
     model = AutoModelForCausalLM.from_pretrained(
         model_name,
         config=config,
@@ -131,9 +128,9 @@ def get_training_args() -> TrainingArguments:
 
 
 def load_cache():
-    if JUDGE_CACHE_FILE.exists():
+    if RL_CACHE_FILE.exists():
         cache = {}
-        with JUDGE_CACHE_FILE.open("r", encoding="utf-8") as f:
+        with RL_CACHE_FILE.open("r", encoding="utf-8") as f:
             for line in f:
                 entry = json.loads(line)
                 key = entry["key"]
@@ -143,7 +140,7 @@ def load_cache():
 
 
 def save_to_cache(entry):
-    with JUDGE_CACHE_FILE.open("a", encoding="utf-8") as f:
+    with RL_CACHE_FILE.open("a", encoding="utf-8") as f:
         f.write(json.dumps(entry) + "\n")
 
 

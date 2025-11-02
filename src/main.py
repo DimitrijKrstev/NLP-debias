@@ -4,11 +4,11 @@ import typer
 
 from dataset.download import download_wnc
 from evaluation.eval_model import evaluate_model
-from judge.main import run_rlhf_training
-from judge.utils import get_judge_score
+from rl.main import run_rlhf_training
+from rl.utils import get_judge_score
 from train import train_model
 
-app = typer.Typer()
+app = typer.Typer(pretty_exceptions_enable=False)
 
 basicConfig(level=INFO)
 logger = getLogger(__name__)

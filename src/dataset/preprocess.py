@@ -1,7 +1,7 @@
 from logging import getLogger
 from typing import Any
 
-from datasets import Dataset
+from datasets import Dataset  # type: ignore[import-untyped]
 from pandas import DataFrame, read_csv
 
 from dataset.constants import DATASET_PATH, TRAINING_PROMPT, WNC_COLUMNS, WNCColumn
@@ -11,16 +11,10 @@ logger = getLogger(__name__)
 
 def get_dataset_slice(
     tokenizer: Any,
-    start_idx: int | None = None,
+    start_idx: int = 0,
     end_idx: int | None = None,
-    max_samples: int | None = None,
-    remove_columns: bool = False,
 ) -> Dataset:
-
     dataset = load_wnc_from_csv()
-
-    if max_samples is not None:
-        dataset = dataset.iloc[:max_samples]
 
     if start_idx is not None or end_idx is not None:
         dataset = dataset.iloc[start_idx:end_idx]
@@ -28,12 +22,10 @@ def get_dataset_slice(
     preprocessed_dataframe = preprocess_data(dataset)
     processed_dataset = Dataset.from_pandas(preprocessed_dataframe)
 
-    tokenize_fn = lambda data: tokenize_data(data, tokenizer)
-
     tokenized_dataset = processed_dataset.map(
-        tokenize_fn,
+        lambda data: tokenize_data(data, tokenizer),
         batched=True,
-        remove_columns=processed_dataset.column_names if remove_columns else None,
+        remove_columns=processed_dataset.column_names,
     )
 
     logger.info(f"Loaded {len(processed_dataset)} examples")
@@ -42,9 +34,7 @@ def get_dataset_slice(
 
 
 def get_train_dataset(tokenizer: Any) -> Dataset:
-    train_idx = int(0.8 * 3000)
-
-    return get_dataset_slice(tokenizer, start_idx=0, end_idx=train_idx)
+    return get_dataset_slice(tokenizer, end_idx=3000)
 
 
 def get_test_dataset(tokenizer: Any) -> Dataset:
@@ -52,18 +42,13 @@ def get_test_dataset(tokenizer: Any) -> Dataset:
 
 
 def get_train_val_split(tokenizer: Any) -> tuple[Dataset, Dataset]:
-    train_idx = int(0.8 * 3000)
-    val_idx = int(0.9 * 3000)
+    train_val_sep_idx = int(0.9 * 3000)
 
-    train_dataset = get_dataset_slice(
-        tokenizer, start_idx=0, end_idx=train_idx, max_samples=3000, remove_columns=True
-    )
+    train_dataset = get_dataset_slice(tokenizer, end_idx=train_val_sep_idx)
     val_dataset = get_dataset_slice(
         tokenizer,
-        start_idx=train_idx,
-        end_idx=val_idx,
-        max_samples=3000,
-        remove_columns=True,
+        start_idx=train_val_sep_idx,
+        end_idx=3000,
     )
 
     logger.info(
@@ -87,7 +72,10 @@ def load_wnc_from_csv() -> DataFrame:
 
 
 def preprocess_data(dataframe: DataFrame) -> DataFrame:
-    dataframe.drop(columns=["id", "src_tok", "tgt_tok", "tgt_parse_tags"], inplace=True)
+    dataframe.drop(
+        columns=["id", "src_tok", "tgt_tok", "tgt_parse_tags", "src_POS_tags"],
+        inplace=True,
+    )
     dataframe = dataframe.rename(
         columns={"src_raw": WNCColumn.BIASED, "tgt_raw": WNCColumn.NEUTRAL}
     )
@@ -119,10 +107,7 @@ def tokenize_data(batch: dict, tokenizer: Any) -> dict:
     )
 
     user_only = tokenizer.apply_chat_template(
-        [
-            [{"role": "user", "content": f"{TRAINING_PROMPT}:\nBiased text: {b}"}]
-            for b in biased_texts
-        ],
+        [[message[0]] for message in messages],
         tokenize=True,
         add_generation_prompt=True,
         max_length=256,

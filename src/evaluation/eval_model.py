@@ -1,5 +1,4 @@
 from logging import getLogger
-from pathlib import Path
 
 import pandas as pd
 from peft import PeftModel
@@ -19,7 +18,7 @@ from utils import load_model, load_tokenizer
 logger = getLogger(__name__)
 
 
-def evaluate_model(model_tokenizer_path: Path, model_name: str) -> dict:
+def evaluate_model(model_tokenizer_path: str, model_name: str) -> None:
     logger.info(f"Loading tokenizer from {model_tokenizer_path}")
     tokenizer = load_tokenizer(model_tokenizer_path)
 
@@ -41,7 +40,7 @@ def evaluate_model(model_tokenizer_path: Path, model_name: str) -> dict:
     logger.info(f"Evaluating on {len(test_dataset)} examples...")
 
     batch_size = 16
-    loader = DataLoader(test_dataset, batch_size=batch_size)
+    loader = DataLoader(test_dataset, batch_size=batch_size)  # type: ignore[arg-type]
 
     for batch in tqdm(loader):
         biased_texts = batch[WNCColumn.BIASED]
@@ -65,6 +64,7 @@ def evaluate_model(model_tokenizer_path: Path, model_name: str) -> dict:
     results = compute_metrics(predictions, references)
 
     logger.info(
-        f"BLEU: {results['bleu']:.2f}, METEOR: {results['meteor']:.2f}, "
-        f"ROUGE-L: {results['rougeL']:.2f}, Semantic Sim: {results['semantic_similarity']:.2f}"
+        f"BLEU: {results.bleu:.2f}, METEOR: {results.meteor:.2f}, "
+        f"ROUGE-L: {results.rougeL:.2f}, Semantic Sim: {results.semantic_similarity:.2f}, "
+        f"Perplexity: {results.perplexity:.2f}"
     )

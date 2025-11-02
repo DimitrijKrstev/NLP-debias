@@ -12,9 +12,9 @@ def build_judge_prompt(biased_text: str, model_output: str, reference_text: str)
 
 
 def get_judge_instructions() -> str:
-    return f"""You are an expert evaluator of bias-neutralization systems.
+    return """You are an expert evaluator of bias-neutralization systems.
         Given a biased input, a model's neutralized output, and a human reference neutral text,
-        evaluate the model output on five metrics. 
+        evaluate the model output on five metrics.
         Each score should be an integer from -10 (extremely poor) to 10 (excellent).
 
         Return your response as strict JSON with:

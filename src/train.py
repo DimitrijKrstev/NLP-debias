@@ -6,7 +6,7 @@ from transformers import DataCollatorForLanguageModeling, Trainer
 
 from constants import TRAIN_OUTPUT_DIR
 from dataset.preprocess import get_train_val_split
-from utils import get_training_args, load_peft_model_and_tokenizer
+from utils import get_training_args, load_peft_model, load_tokenizer
 
 environ["TOKENIZERS_PARALLELISM"] = "false"
 
@@ -21,7 +21,8 @@ def train_model(
     mlflow.set_experiment(mlflow_experiment)
     mlflow.start_run(run_name=f"{model_name}-debiasing")
 
-    model, tokenizer = load_peft_model_and_tokenizer(model_name, quantize)
+    model = load_peft_model(model_name, quantize)
+    tokenizer = load_tokenizer(model_name)
     model.train()
 
     logger.info("Loading and pre-processing dataset")

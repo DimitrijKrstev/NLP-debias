@@ -2,7 +2,7 @@ import os
 import shutil
 from logging import getLogger
 
-from kagglehub import dataset_download
+from kagglehub import dataset_download  # type: ignore[import-untyped]
 
 from dataset.constants import DATASET_DOWNLOAD_PATH
 

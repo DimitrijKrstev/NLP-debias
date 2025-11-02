@@ -1,32 +1,37 @@
 import re
 
 import torch
-from evaluate import load as evaluate_load
+from evaluate import load as evaluate_load  # type: ignore[import-untyped]
 from sentence_transformers import SentenceTransformer, util
 
+from evaluation.models import Metrics
 
-def compute_metrics(predictions: list[str], references: list[str]) -> dict[str, float]:
+
+def compute_metrics(predictions: list[str], references: list[str]) -> Metrics:
     bleu = evaluate_load("bleu")
     meteor = evaluate_load("meteor")
     rouge = evaluate_load("rouge")
+    perplexity = evaluate_load("perplexity", module_type="metric")
 
     bleu_score = bleu.compute(predictions=predictions, references=references)
     meteor_score = meteor.compute(predictions=predictions, references=references)
     rouge_scores = rouge.compute(predictions=predictions, references=references)
+    perplexity_score = perplexity.compute(
+        predictions=predictions, references=references
+    )
 
     similarity_model = SentenceTransformer("all-MiniLM-L6-v2")
     pred_emb = similarity_model.encode(predictions, convert_to_tensor=True)
     ref_emb = similarity_model.encode(references, convert_to_tensor=True)
     semantic_sim = util.cos_sim(pred_emb, ref_emb).diagonal().mean().item()
 
-    return {
-        "bleu": bleu_score["bleu"] * 100,
-        "meteor": meteor_score["meteor"] * 100,
-        "rouge1": rouge_scores["rouge1"] * 100,
-        "rouge2": rouge_scores["rouge2"] * 100,
-        "rougeL": rouge_scores["rougeL"] * 100,
-        "semantic_similarity": semantic_sim * 100,
-    }
+    return Metrics.from_scores(
+        bleu_score=bleu_score,
+        meteor_score=meteor_score,
+        rouge_scores=rouge_scores,
+        perplexity_score=perplexity_score,
+        semantic_sim=semantic_sim,
+    )
 
 
 def clean_output(text: str) -> str:
@@ -50,7 +55,7 @@ def make_chat_prompt(biased_text: str) -> str:
     )
 
 
-def debias_text(text: str, model, tokenizer, max_length: int = 256):
+def debias_text(text: list[str], model, tokenizer, max_length: int = 256):
     inputs = tokenizer(
         [f"{b}\n" for b in text],
         return_tensors="pt",
