@@ -43,25 +43,24 @@ def eval_model(
 @app.command()
 def train_rl_model(
     model_name: str = "Qwen/Qwen3-4B",
-    open_ai_remote_model_name: str = "gpt-oss-120b",
     mflow_experiment: str = "RL-NLP-Debias",
     quantize: bool = True,
 ) -> None:
     run_rlhf_training(
         model_name,
-        open_ai_remote_model_name,
         mflow_experiment,
         quantize,
     )
 
 
 @app.command()
-def test_openai() -> None:
+def test_openai(open_ai_remote_model_name: str = "gpt-5-mini") -> None:
     logger.info(
         get_judge_score(
             "during the campaign , controversy erupted over alleged differences between pali ##n ' s positions as a gubernatorial candidate and her position as a vice - presidential candidate .",
             "during the campaign , some pointed out alleged differences between pali ##n ' s positions as a gubernatorial candidate and her position as a vice - presidential candidate .	",
             "during the campaign, some pointed out alleged differences between pali's positions as a gubernatorial candidate and her position as a vice - presidential candidate.",
+            open_ai_remote_model_name,
         )
     )
 

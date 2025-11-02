@@ -1,122 +1,45 @@
 from logging import getLogger
 
 import mlflow
-from transformers import DataCollatorWithPadding
-from trl.models.modeling_value_head import AutoModelForCausalLMWithValueHead
-from trl.trainer.ppo_config import PPOConfig
-from trl.trainer.ppo_trainer import PPOTrainer
+from trl.trainer.grpo_trainer import GRPOTrainer
 
+from constants import RL_OUTPUT_DIR
 from dataset.preprocess import get_train_dataset
-from rl.llm_judge import LLMJudgeRewardModel
-from rl.utils import get_judge_score
-from utils import load_model, load_tokenizer
+from rl.utils import get_grpo_config, reward_func, sync_model_tokenizer_config
+from utils import load_peft_model, load_tokenizer
 
 logger = getLogger(__name__)
 
 
 def run_rlhf_training(
     model_name: str,
-    open_ai_remote_model_name: str,
     mlflow_experiment: str,
     quantize: bool,
 ) -> None:
     mlflow.set_experiment(mlflow_experiment)
-    mlflow.start_run(run_name=f"{model_name}-rlhf-debiasing")
 
     tokenizer = load_tokenizer(model_name)
 
-    dataset = get_train_dataset(tokenizer)
-    data_collator = DataCollatorWithPadding(tokenizer=tokenizer, padding=True)
+    dataset = get_train_dataset(tokenizer, True)
 
-    base_model = load_model(model_name, quantize)
-    model = AutoModelForCausalLMWithValueHead(base_model)
-    model.generation_config = base_model.generation_config
-    model.is_gradient_checkpointing = getattr(
-        base_model, "is_gradient_checkpointing", False
-    )
+    model = load_peft_model(model_name, quantize)
+    sync_model_tokenizer_config(model, tokenizer)
+
     model.train()
 
-    reference_model = load_model(model_name, quantize)
-    reference_model.eval()
+    grpo_config = get_grpo_config(model_name)
 
-    value_model = load_model(model_name, quantize)
-    value_model.eval()
-
-    reward_model = LLMJudgeRewardModel(
-        get_judge_score, open_ai_remote_model_name, tokenizer, dataset
-    )
-
-    ppo_config = PPOConfig(
-        exp_name=f"{model_name}-rlhf",
-        per_device_train_batch_size=4,
-        num_mini_batches=2,
-        num_ppo_epochs=4,
-        learning_rate=1e-5,
-        kl_coef=0.05,
-        cliprange=0.2,
-        vf_coef=0.1,
-        cliprange_value=0.2,
-        gamma=1.0,
-        lam=0.95,
-        whiten_rewards=False,
-    )
-
-    ppo_trainer = PPOTrainer(
-        args=ppo_config,
-        processing_class=tokenizer,
+    grpo_trainer = GRPOTrainer(
         model=model,
-        ref_model=reference_model,
-        reward_model=reward_model,
-        value_model=value_model,
-        train_dataset=dataset.remove_columns(["biased_text", "neutral_text"]),
-        data_collator=data_collator,
+        processing_class=tokenizer,
+        args=grpo_config,
+        train_dataset=dataset,
+        reward_funcs=reward_func,
     )
 
-    # gen_kwargs = {
-    #     "max_new_tokens": 128,
-    #     "do_sample": True,
-    #     "top_p": 0.9,
-    #     "temperature": 0.7,
-    #     "pad_token_id": tokenizer.pad_token_id or tokenizer.eos_token_id,
-    # }
+    logger.info("Starting GRPO training with sentence-level judge scoring...")
+    grpo_trainer.train()
 
-    logger.info("Starting PPO training with sentence-level judge scoring...")
-    ppo_trainer.train()
-
-    # for epoch, batch in enumerate(ppo_trainer.dataloader):
-    #     query_tensors = batch["input_ids"]
-    #     biased_texts = batch.get("biased_text", [""] * len(query_tensors))
-    #     reference_texts = batch.get("reference_text", [""] * len(query_tensors))
-
-    #     reward_model.set_batch_context(biased_texts, reference_texts)
-
-    #     with torch.no_grad():
-    #         response_tensors = model.generate(
-    #             query_tensors,
-    #             pad_token_id=tokenizer.pad_token_id or tokenizer.eos_token_id,
-    #             **gen_kwargs
-    #         )
-    #         response_tensors = response_tensors[:, query_tensors.shape[1]:]
-
-    #     rewards = reward_model(response_tensors).squeeze()
-
-    #     stats = ppo_trainer.step(query_tensors, response_tensors, rewards)
-
-    #     if epoch % 10 == 0:
-    #         if len(rewards) > 0:
-    #             mlflow.log_metrics(
-    #                 {
-    #                     "reward_mean": rewards.mean().item(),
-    #                     "reward_std": rewards.std().item(),
-    #                 },
-    #                 step=epoch,
-    #             )
-    #             logger.info(
-    #                 f"Epoch {epoch} - Avg Reward: {rewards.mean():.3f}"
-    #             )
-
-    model.save_pretrained("./rlhf-debiasing-model")
-    tokenizer.save_pretrained("./rlhf-debiasing-model")
-
-    mlflow.log_artifact("./rlhf-debiasing-model")
-    mlflow.end_run()
+    model.save_pretrained(RL_OUTPUT_DIR / "grpo-debiasing-model")
+    tokenizer.save_pretrained(RL_OUTPUT_DIR / "grpo-debiasing-model")
+    mlflow.log_artifact((RL_OUTPUT_DIR / "grpo-debiasing-model").as_posix())

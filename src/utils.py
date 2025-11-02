@@ -54,15 +54,13 @@ def load_peft_model(model_name: str, quantize: bool) -> Any:
     return model
 
 
-def load_model(model_name: str | Path, quantize: bool, is_rl: bool = False) -> Any:
+def load_model(model_name: str | Path, quantize: bool) -> Any:
     bnb_config = (
         BitsAndBytesConfig(
-            # load_in_4bit=True,
+            load_in_4bit=True,
             bnb_4bit_use_double_quant=True,
             bnb_4bit_quant_type="nf4",
-            bnb_4bit_compute_dtype=(
-                torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
-            ),
+            bnb_4bit_compute_dtype=torch.bfloat16,
         )
         if quantize
         else None
@@ -75,7 +73,7 @@ def load_model(model_name: str | Path, quantize: bool, is_rl: bool = False) -> A
         model_name,
         config=config,
         quantization_config=bnb_config,
-        dtype=torch.float16,
+        dtype=torch.bfloat16,
         token=HF_TOKEN,
         device_map="auto",
         low_cpu_mem_usage=True,
@@ -95,6 +93,8 @@ def load_tokenizer(model_name: str | Path) -> Any:
 
     if tokenizer.pad_token_id is None:
         tokenizer.pad_token = tokenizer.eos_token
+
+    tokenizer.padding_side = "left"
 
     return tokenizer
 
@@ -123,26 +123,5 @@ def get_training_args() -> TrainingArguments:
         report_to=["mlflow"],
         run_name="qwen3-debiasing",
         dataloader_num_workers=2,
-        fp16=True,
+        bf16=True,
     )
-
-
-def load_cache():
-    if RL_CACHE_FILE.exists():
-        cache = {}
-        with RL_CACHE_FILE.open("r", encoding="utf-8") as f:
-            for line in f:
-                entry = json.loads(line)
-                key = entry["key"]
-                cache[key] = entry
-        return cache
-    return {}
-
-
-def save_to_cache(entry):
-    with RL_CACHE_FILE.open("a", encoding="utf-8") as f:
-        f.write(json.dumps(entry) + "\n")
-
-
-def make_cache_key(biased, prediction, neutral_ref):
-    return f"{hash((biased, prediction, neutral_ref))}"

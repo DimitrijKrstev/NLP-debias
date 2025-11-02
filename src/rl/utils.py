@@ -8,8 +8,10 @@ from dotenv import load_dotenv
 from openai import OpenAI
 
 from constants import JUDGE_SCORE_FILE
+from dataset.constants import WNCColumn
 from rl.models import ModelResponseEvaluation
 from rl.prompt import build_judge_prompt, get_judge_instructions
+from trl.trainer.grpo_config import GRPOConfig
 
 logger = getLogger(__name__)
 
@@ -22,9 +24,9 @@ def get_judge_score(
     biased_text: str,
     model_output: str,
     reference_text: str,
-    openai_model: str = "gpt-4o-mini",
+    openai_model: str = "gpt-5-mini",
     max_retries: int = 3,
-) -> float | None:
+) -> float:
 
     instructions = get_judge_instructions()
     prompt = build_judge_prompt(biased_text, model_output, reference_text)
@@ -41,9 +43,9 @@ def get_judge_score(
 
             if not score:
                 logger.error(f"Empty response from {openai_model}")
-                return None
+                return 0.0
 
-            total_score = score.sum_all()
+            total_score = score.get_normalized_full_score()
 
             logger.info(
                 f"Judge score: {total_score:.2f} | "
@@ -69,7 +71,7 @@ def get_judge_score(
                     exc_info=True,
                 )
 
-    return None
+    return 0.0
 
 
 def append_results_to_csv(
@@ -78,7 +80,10 @@ def append_results_to_csv(
     reference_text: str,
     score: float | None,
 ) -> None:
-    file_exists = Path(JUDGE_SCORE_FILE).is_file()
+    path = Path(JUDGE_SCORE_FILE)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    file_exists = path.is_file()
+
     with open(JUDGE_SCORE_FILE, mode="a", newline="", encoding="utf-8") as csvfile:
         fieldnames = ["biased_text", "model_output", "reference_text", "score"]
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
@@ -94,3 +99,63 @@ def append_results_to_csv(
                 "score": score,
             }
         )
+
+
+def reward_func(
+    prompts: list[str],
+    completions: list[dict],
+    **kwargs,
+) -> list[float]:
+    rewards = []
+
+    biased_texts = kwargs[WNCColumn.BIASED]
+    neutral_texts = kwargs[WNCColumn.NEUTRAL]
+
+    for completion, biased_text, neutral_text in zip(
+        completions, biased_texts, neutral_texts
+    ):
+        score = get_judge_score(
+            biased_text=biased_text,
+            model_output=completion[0]["content"],
+            reference_text=neutral_text,
+        )
+
+        rewards.append(score if score is not None else 0.0)
+
+    return rewards
+
+
+def sync_model_tokenizer_config(model, tokenizer):
+    model.config.pad_token_id = tokenizer.pad_token_id
+    model.config.bos_token_id = tokenizer.bos_token_id
+    model.config.eos_token_id = tokenizer.eos_token_id
+
+    if hasattr(model, "generation_config") and model.generation_config is not None:
+        model.generation_config.pad_token_id = tokenizer.pad_token_id
+        model.generation_config.bos_token_id = tokenizer.bos_token_id
+        model.generation_config.eos_token_id = tokenizer.eos_token_id
+
+
+def get_grpo_config(model_name: str) -> GRPOConfig:
+    return GRPOConfig(
+        output_dir="./grpo-debiasing-model",
+        run_name=f"{model_name}-grpo-debiasing",
+        per_device_train_batch_size=3,
+        num_train_epochs=3,
+        learning_rate=1e-6,
+        num_generations=3,
+        generation_batch_size=3,
+        max_prompt_length=256,
+        max_completion_length=256,
+        beta=0.01,
+        epsilon=0.2,
+        loss_type="dapo",
+        temperature=0.7,
+        top_p=0.9,
+        logging_steps=10,
+        save_strategy="epoch",
+        gradient_checkpointing=False,
+        bf16=True,
+        remove_unused_columns=False,
+        report_to="mlflow",
+    )

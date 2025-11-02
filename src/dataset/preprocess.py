@@ -4,6 +4,7 @@ from typing import Any
 from datasets import Dataset  # type: ignore[import-untyped]
 from pandas import DataFrame, read_csv
 
+from constants import GRPO_SYSTEM_PROMPT
 from dataset.constants import DATASET_PATH, TRAINING_PROMPT, WNC_COLUMNS, WNCColumn
 
 logger = getLogger(__name__)
@@ -13,32 +14,41 @@ def get_dataset_slice(
     tokenizer: Any,
     start_idx: int = 0,
     end_idx: int | None = None,
+    is_rl: bool = False,
 ) -> Dataset:
     dataset = load_wnc_from_csv()
 
-    if start_idx is not None or end_idx is not None:
+    if end_idx is not None:
         dataset = dataset.iloc[start_idx:end_idx]
+    else:
+        dataset = dataset.iloc[start_idx:]
 
     preprocessed_dataframe = preprocess_data(dataset)
     processed_dataset = Dataset.from_pandas(preprocessed_dataframe)
 
-    tokenized_dataset = processed_dataset.map(
-        lambda data: tokenize_data(data, tokenizer),
-        batched=True,
-        remove_columns=processed_dataset.column_names,
-    )
+    if is_rl:
+        tokenized_dataset = processed_dataset.map(
+            lambda data: map_grpo_data(data),
+            batched=False,
+        )
+    else:
+        tokenized_dataset = processed_dataset.map(
+            lambda data: tokenize_data(data, tokenizer),
+            batched=True,
+            remove_columns=processed_dataset.column_names,
+        )
 
     logger.info(f"Loaded {len(processed_dataset)} examples")
 
     return tokenized_dataset
 
 
-def get_train_dataset(tokenizer: Any) -> Dataset:
-    return get_dataset_slice(tokenizer, end_idx=3000)
+def get_train_dataset(tokenizer: Any, is_rl: bool = False) -> Dataset:
+    return get_dataset_slice(tokenizer, end_idx=3000, is_rl=is_rl)
 
 
-def get_test_dataset(tokenizer: Any) -> Dataset:
-    return get_dataset_slice(tokenizer, start_idx=-1000, end_idx=None)
+def get_test_dataset(tokenizer: Any, is_rl: bool = False) -> Dataset:
+    return get_dataset_slice(tokenizer, start_idx=-1000, end_idx=None, is_rl=is_rl)
 
 
 def get_train_val_split(tokenizer: Any) -> tuple[Dataset, Dataset]:
@@ -46,9 +56,7 @@ def get_train_val_split(tokenizer: Any) -> tuple[Dataset, Dataset]:
 
     train_dataset = get_dataset_slice(tokenizer, end_idx=train_val_sep_idx)
     val_dataset = get_dataset_slice(
-        tokenizer,
-        start_idx=train_val_sep_idx,
-        end_idx=3000,
+        tokenizer, start_idx=train_val_sep_idx, end_idx=3000
     )
 
     logger.info(
@@ -130,4 +138,13 @@ def tokenize_data(batch: dict, tokenizer: Any) -> dict:
         "attention_mask": [[1] * len(ids) for ids in input_ids],
         "biased_text": batch[WNCColumn.BIASED],
         "neutral_text": batch[WNCColumn.NEUTRAL],
+    }
+
+
+def map_grpo_data(sample: dict) -> dict:
+    return {
+        "prompt": [
+            {"role": "system", "content": GRPO_SYSTEM_PROMPT},
+            {"role": "user", "content": sample[WNCColumn.BIASED]},
+        ],
     }
