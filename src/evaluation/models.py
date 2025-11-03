@@ -10,6 +10,7 @@ class Metrics:
     rougeL: float
     semantic_similarity: float
     perplexity: float
+    bertscore_f1: float
 
     @classmethod
     def from_scores(
@@ -19,6 +20,7 @@ class Metrics:
         rouge_scores: dict | None,
         perplexity_score: dict | None,
         semantic_sim: float,
+        bertscore_f1: float,
     ) -> "Metrics":
         """Create Metrics from raw evaluation scores, handling scaling and missing values."""
         return cls(
@@ -31,4 +33,5 @@ class Metrics:
             perplexity=(
                 perplexity_score["mean_perplexity"] if perplexity_score else -1.0
             ),
+            bertscore_f1=bertscore_f1 * 100,
         )

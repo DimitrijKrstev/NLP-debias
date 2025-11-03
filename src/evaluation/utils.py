@@ -1,3 +1,4 @@
+import os
 import re
 
 import torch
@@ -6,12 +7,15 @@ from sentence_transformers import SentenceTransformer, util
 
 from evaluation.models import Metrics
 
+os.environ["MPLBACKEND"] = "Agg"
+
 
 def compute_metrics(predictions: list[str], references: list[str]) -> Metrics:
     bleu = evaluate_load("bleu")
     meteor = evaluate_load("meteor")
     rouge = evaluate_load("rouge")
     perplexity = evaluate_load("perplexity", module_type="metric")
+    bertscore = evaluate_load("bertscore")
 
     bleu_score = bleu.compute(predictions=predictions, references=references)
     meteor_score = meteor.compute(predictions=predictions, references=references)
@@ -19,11 +23,17 @@ def compute_metrics(predictions: list[str], references: list[str]) -> Metrics:
     perplexity_score = perplexity.compute(
         predictions=predictions, references=references
     )
+    bertscore_result = bertscore.compute(
+        predictions=predictions,
+        references=references,
+        model_type="bert-base-uncased",  
+    )
 
     similarity_model = SentenceTransformer("all-MiniLM-L6-v2")
     pred_emb = similarity_model.encode(predictions, convert_to_tensor=True)
     ref_emb = similarity_model.encode(references, convert_to_tensor=True)
     semantic_sim = util.cos_sim(pred_emb, ref_emb).diagonal().mean().item()
+    bertscore_f1 = sum(bertscore_result["f1"]) / len(bertscore_result["f1"])
 
     return Metrics.from_scores(
         bleu_score=bleu_score,
@@ -31,6 +41,7 @@ def compute_metrics(predictions: list[str], references: list[str]) -> Metrics:
         rouge_scores=rouge_scores,
         perplexity_score=perplexity_score,
         semantic_sim=semantic_sim,
+        bertscore_f1=bertscore_f1,
     )
 
 

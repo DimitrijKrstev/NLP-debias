@@ -136,8 +136,8 @@ def tokenize_data(batch: dict, tokenizer: Any) -> dict:
         "input_ids": input_ids,
         "labels": labels,
         "attention_mask": [[1] * len(ids) for ids in input_ids],
-        "biased_text": batch[WNCColumn.BIASED],
-        "neutral_text": batch[WNCColumn.NEUTRAL],
+        "biased": batch[WNCColumn.BIASED],
+        "neutral": batch[WNCColumn.NEUTRAL],
     }
 
 

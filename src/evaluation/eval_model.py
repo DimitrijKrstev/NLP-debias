@@ -64,7 +64,11 @@ def evaluate_model(model_tokenizer_path: str, model_name: str) -> None:
     results = compute_metrics(predictions, references)
 
     logger.info(
-        f"BLEU: {results.bleu:.2f}, METEOR: {results.meteor:.2f}, "
-        f"ROUGE-L: {results.rougeL:.2f}, Semantic Sim: {results.semantic_similarity:.2f}, "
-        f"Perplexity: {results.perplexity:.2f}"
+        "Evaluation Metrics:\n"
+        f"  BLEU:           {results.bleu:.2f}\n"
+        f"  METEOR:         {results.meteor:.2f}\n"
+        f"  ROUGE-L:        {results.rougeL:.2f}\n"
+        f"  Semantic Sim:   {results.semantic_similarity:.2f}\n"
+        f"  Perplexity:     {results.perplexity:.2f}\n"
+        f"  BERTScore-F1:   {results.bertscore_f1:.2f}"
     )
