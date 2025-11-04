@@ -7,12 +7,8 @@ from tqdm import tqdm
 
 from dataset.constants import WNCColumn
 from dataset.preprocess import get_test_dataset
-from evaluation.utils import (
-    clean_output,
-    compute_metrics,
-    debias_text,
-    make_chat_prompt,
-)
+from evaluation.utils import (clean_output, compute_metrics, debias_text,
+                              make_chat_prompt)
 from utils import load_model, load_tokenizer
 
 logger = getLogger(__name__)

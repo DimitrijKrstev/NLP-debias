@@ -1,4 +1,5 @@
 import csv
+import re
 import time
 from logging import getLogger
 from os import getenv
@@ -114,9 +115,10 @@ def reward_func(
     for completion, biased_text, neutral_text in zip(
         completions, biased_texts, neutral_texts
     ):
+        model_output = remove_thinking_tags(completion[0]["content"])
         score = get_judge_score(
             biased_text=biased_text,
-            model_output=completion[0]["content"],
+            model_output=model_output,
             reference_text=neutral_text,
         )
 
@@ -140,7 +142,7 @@ def get_grpo_config(model_name: str) -> GRPOConfig:
     return GRPOConfig(
         output_dir="./grpo-debiasing-model",
         run_name=f"{model_name}-grpo-debiasing",
-        per_device_train_batch_size=3,
+        per_device_train_batch_size=3,        
         num_train_epochs=3,
         learning_rate=1e-6,
         num_generations=3,
@@ -152,10 +154,17 @@ def get_grpo_config(model_name: str) -> GRPOConfig:
         loss_type="dapo",
         temperature=0.7,
         top_p=0.9,
-        logging_steps=10,
-        save_strategy="epoch",
+        logging_steps=50,
+        save_strategy="steps",
+        save_steps=500,                
+        save_total_limit=3,
         gradient_checkpointing=False,
         bf16=True,
         remove_unused_columns=False,
         report_to="mlflow",
     )
+
+
+def remove_thinking_tags(text: str) -> str:
+    text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL)
+    return text.strip()

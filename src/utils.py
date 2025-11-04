@@ -4,14 +4,10 @@ from pathlib import Path
 from typing import Any
 
 import torch
-from peft import LoraConfig, TaskType, get_peft_model, prepare_model_for_kbit_training
-from transformers import (
-    AutoConfig,
-    AutoModelForCausalLM,
-    AutoTokenizer,
-    BitsAndBytesConfig,
-    TrainingArguments,
-)
+from peft import (LoraConfig, TaskType, get_peft_model,
+                  prepare_model_for_kbit_training)
+from transformers import (AutoConfig, AutoModelForCausalLM, AutoTokenizer,
+                          BitsAndBytesConfig, TrainingArguments)
 
 from constants import RL_CACHE_FILE, TRAIN_OUTPUT_DIR
 

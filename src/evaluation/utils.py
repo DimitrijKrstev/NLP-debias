@@ -26,7 +26,7 @@ def compute_metrics(predictions: list[str], references: list[str]) -> Metrics:
     bertscore_result = bertscore.compute(
         predictions=predictions,
         references=references,
-        model_type="bert-base-uncased",  
+        model_type="bert-base-uncased",
     )
 
     similarity_model = SentenceTransformer("all-MiniLM-L6-v2")

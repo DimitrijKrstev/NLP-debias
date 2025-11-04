@@ -5,7 +5,8 @@ from datasets import Dataset  # type: ignore[import-untyped]
 from pandas import DataFrame, read_csv
 
 from constants import GRPO_SYSTEM_PROMPT
-from dataset.constants import DATASET_PATH, TRAINING_PROMPT, WNC_COLUMNS, WNCColumn
+from dataset.constants import (DATASET_PATH, TRAINING_PROMPT, WNC_COLUMNS,
+                               WNCColumn)
 
 logger = getLogger(__name__)
 
@@ -145,6 +146,10 @@ def map_grpo_data(sample: dict) -> dict:
     return {
         "prompt": [
             {"role": "system", "content": GRPO_SYSTEM_PROMPT},
-            {"role": "user", "content": sample[WNCColumn.BIASED]},
+            {
+                "role": "user",
+                "content": f"Make this neutral: {sample[WNCColumn.BIASED]}",
+            },
+            {"role": "assistant", "content": " "},
         ],
     }

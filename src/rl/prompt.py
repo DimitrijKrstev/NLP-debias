@@ -17,10 +17,14 @@ def get_judge_instructions() -> str:
         evaluate the model output on five metrics.
         Each score should be an integer from -10 (extremely poor) to 10 (excellent).
 
+        Note: The reference neutral text may not always be perfect.
+        If the reference contains slight imperfections or inconsistencies,
+        you should still provide fair and independent judgments for each metric
+        based primarily on the model output's own quality.
+
         Return your response as strict JSON with:
         - a numeric score for each metric, and
         - one concise "overall_reasoning" sentence summarizing the overall assessment.
-
 
         Metrics to score (-10 to 10):
         1. Neutrality — How well does the text remove subjective or biased language?
