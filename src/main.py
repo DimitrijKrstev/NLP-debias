@@ -33,7 +33,7 @@ def sft_train_model(
 
 @app.command()
 def eval_model(
-    model_tokenizer_path: str = "output/",
+    model_tokenizer_path: str = "grpo-debiasing-model/checkpoint-2200",
     model_name: str = "Qwen/Qwen3-4B",
 ) -> None:
     logger.info(f"Evaluating model: {model_name}")

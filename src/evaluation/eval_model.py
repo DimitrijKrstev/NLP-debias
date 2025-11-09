@@ -1,18 +1,16 @@
+import csv
 from logging import getLogger
 
-import pandas as pd
 from peft import PeftModel
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from dataset.constants import WNCColumn
 from dataset.preprocess import get_test_dataset
-from evaluation.utils import (clean_output, compute_metrics, debias_text,
-                              make_chat_prompt)
+from evaluation.utils import clean_output, compute_metrics, debias_text
 from utils import load_model, load_tokenizer
 
 logger = getLogger(__name__)
-
 
 def evaluate_model(model_tokenizer_path: str, model_name: str) -> None:
     logger.info(f"Loading tokenizer from {model_tokenizer_path}")
@@ -29,35 +27,33 @@ def evaluate_model(model_tokenizer_path: str, model_name: str) -> None:
     logger.info("Loading test dataset...")
     test_dataset = get_test_dataset(tokenizer)
 
-    predictions = []
-    references = []
-    biased_list = []
-
     logger.info(f"Evaluating on {len(test_dataset)} examples...")
 
     batch_size = 16
     loader = DataLoader(test_dataset, batch_size=batch_size)  # type: ignore[arg-type]
 
-    for batch in tqdm(loader):
-        biased_texts = batch[WNCColumn.BIASED]
-        neutral_texts = batch[WNCColumn.NEUTRAL]
+    csv_file = "wnc_predictions.csv"
+    with open(csv_file, mode="w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(["biased", "neutral_ref", "predicted"])
 
-        prompts = [make_chat_prompt(text) for text in biased_texts]
-        predicted_texts = debias_text(prompts, model, tokenizer)
+        all_predictions = []
+        all_references = []
 
-        predicted_texts = [clean_output(t) for t in predicted_texts]
+        for batch in tqdm(loader):
+            biased_texts = batch[WNCColumn.BIASED]
+            neutral_texts = batch[WNCColumn.NEUTRAL]
 
-        predictions.extend(predicted_texts)
-        references.extend(neutral_texts)
-        biased_list.extend(biased_texts)
+            prompts = [text for text in biased_texts]
+            predicted_texts = debias_text(prompts, model, tokenizer)
 
-    df = pd.DataFrame(
-        {"biased": biased_list, "neutral_ref": references, "predicted": predictions}
-    )
+            for b, r, p in zip(biased_texts, neutral_texts, predicted_texts):
+                writer.writerow([b, r, p])
 
-    df.to_csv("wnc_predictions.csv", index=False)
+            all_predictions.extend(predicted_texts)
+            all_references.extend(neutral_texts)
 
-    results = compute_metrics(predictions, references)
+    results = compute_metrics(all_predictions, all_references)
 
     logger.info(
         "Evaluation Metrics:\n"
@@ -65,6 +61,5 @@ def evaluate_model(model_tokenizer_path: str, model_name: str) -> None:
         f"  METEOR:         {results.meteor:.2f}\n"
         f"  ROUGE-L:        {results.rougeL:.2f}\n"
         f"  Semantic Sim:   {results.semantic_similarity:.2f}\n"
-        f"  Perplexity:     {results.perplexity:.2f}\n"
         f"  BERTScore-F1:   {results.bertscore_f1:.2f}"
     )

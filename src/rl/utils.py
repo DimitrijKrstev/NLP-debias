@@ -156,7 +156,7 @@ def get_grpo_config(model_name: str) -> GRPOConfig:
         top_p=0.9,
         logging_steps=50,
         save_strategy="steps",
-        save_steps=500,                
+        save_steps=100,                
         save_total_limit=3,
         gradient_checkpointing=False,
         bf16=True,
