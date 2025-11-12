@@ -1,11 +1,11 @@
 import os
-import re
 
 import torch
 from evaluate import load as evaluate_load  # type: ignore[import-untyped]
 from sentence_transformers import SentenceTransformer, util
+
 from constants import GRPO_SYSTEM_PROMPT
-from models import Metrics
+from evaluation.models import Metrics
 
 os.environ["MPLBACKEND"] = "Agg"
 
@@ -45,8 +45,9 @@ def clean_output(text: str) -> str:
         text = text.split("</think>")[-1]
     elif "<think>" in text:
         text = text.split("<think>")[0]
-    
+
     return text
+
 
 def make_chat_prompt(biased_text: str) -> list[dict]:
     return [
@@ -54,15 +55,16 @@ def make_chat_prompt(biased_text: str) -> list[dict]:
         {"role": "user", "content": f"Make this neutral: {biased_text}"},
     ]
 
+
 def debias_text(texts: list[str], model, tokenizer, max_length: int = 256) -> list[str]:
     chat_prompts = [make_chat_prompt(text) for text in texts]
-    
+
     formatted_prompts = tokenizer.apply_chat_template(
         chat_prompts,
         tokenize=False,
         add_generation_prompt=False,
     )
-    
+
     inputs = tokenizer(
         formatted_prompts,
         return_tensors="pt",
@@ -82,11 +84,13 @@ def debias_text(texts: list[str], model, tokenizer, max_length: int = 256) -> li
             eos_token_id=tokenizer.eos_token_id,
         )
 
-    input_lengths = inputs['input_ids'].shape[1]
+    input_lengths = inputs["input_ids"].shape[1]
     generated_tokens = outputs[:, input_lengths:]
-    
-    decoded_outputs = tokenizer.batch_decode(generated_tokens, skip_special_tokens=False)
-    
+
+    decoded_outputs = tokenizer.batch_decode(
+        generated_tokens, skip_special_tokens=False
+    )
+
     predicted_texts = [clean_output(text) for text in decoded_outputs]
 
     return predicted_texts
