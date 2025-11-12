@@ -142,7 +142,7 @@ def get_grpo_config(model_name: str) -> GRPOConfig:
     return GRPOConfig(
         output_dir="./grpo-debiasing-model",
         run_name=f"{model_name}-grpo-debiasing",
-        per_device_train_batch_size=3,        
+        per_device_train_batch_size=3,
         num_train_epochs=3,
         learning_rate=1e-6,
         num_generations=3,
@@ -156,7 +156,7 @@ def get_grpo_config(model_name: str) -> GRPOConfig:
         top_p=0.9,
         logging_steps=50,
         save_strategy="steps",
-        save_steps=100,                
+        save_steps=100,
         save_total_limit=3,
         gradient_checkpointing=False,
         bf16=True,

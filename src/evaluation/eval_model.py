@@ -7,10 +7,11 @@ from tqdm import tqdm
 
 from dataset.constants import WNCColumn
 from dataset.preprocess import get_test_dataset
-from evaluation.utils import clean_output, compute_metrics, debias_text
+from evaluation.utils import compute_metrics, debias_text
 from utils import load_model, load_tokenizer
 
 logger = getLogger(__name__)
+
 
 def evaluate_model(model_tokenizer_path: str, model_name: str) -> None:
     logger.info(f"Loading tokenizer from {model_tokenizer_path}")
