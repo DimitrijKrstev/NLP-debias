@@ -5,8 +5,7 @@ from datasets import Dataset  # type: ignore[import-untyped]
 from pandas import DataFrame, read_csv
 
 from constants import GRPO_SYSTEM_PROMPT
-from dataset.constants import (DATASET_PATH, TRAINING_PROMPT, WNC_COLUMNS,
-                               WNCColumn)
+from dataset.constants import DATASET_PATH, TRAINING_PROMPT, WNC_COLUMNS, WNCColumn
 
 logger = getLogger(__name__)
 
@@ -18,11 +17,11 @@ def get_dataset_slice(
     is_rl: bool = False,
 ) -> Dataset:
     dataset = load_wnc_from_csv()
-
-    if end_idx is not None:
-        dataset = dataset.iloc[start_idx:end_idx]
-    else:
-        dataset = dataset.iloc[start_idx:]
+    dataset_subset = (
+        dataset.iloc[start_idx:end_idx]
+        if end_idx is not None
+        else dataset.iloc[start_idx:]
+    )
 
     preprocessed_dataframe = preprocess_data(dataset)
     processed_dataset = Dataset.from_pandas(preprocessed_dataframe)

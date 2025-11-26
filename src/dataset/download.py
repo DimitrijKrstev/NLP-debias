@@ -4,15 +4,13 @@ from logging import getLogger
 
 from kagglehub import dataset_download  # type: ignore[import-untyped]
 
-from dataset.constants import DATASET_DOWNLOAD_PATH
+from dataset.constants import DATASET_DOWNLOAD_PATH, DATASET_NAME
 
 logger = getLogger(__name__)
 
 
 def download_wnc() -> None:
-    path = dataset_download(
-        "chandiragunatilleke/wiki-neutrality-corpus", force_download=True
-    )
+    path = dataset_download(DATASET_NAME, force_download=True)
     logger.info(f"Downloaded dataset to {path}")
 
     try:
@@ -20,12 +18,12 @@ def download_wnc() -> None:
             shutil.move(path, DATASET_DOWNLOAD_PATH)
         else:
             logger.info("Source directory is read-only; copying instead of moving...")
-            shutil.copytree(path, DATASET_DOWNLOAD_PATH, dirs_exist_ok=True)
+            shutil.copytree(path, DATASET_DOWNLOAD_PATH)
 
         wnc_subdir = DATASET_DOWNLOAD_PATH / "1" / "WNC"
         if wnc_subdir.exists():
             shutil.move(wnc_subdir, DATASET_DOWNLOAD_PATH)
-            shutil.rmtree(DATASET_DOWNLOAD_PATH / "1", ignore_errors=True)
+            shutil.rmtree(DATASET_DOWNLOAD_PATH / "1")
 
     except Exception as e:
         logger.error(f"Error moving dataset to {DATASET_DOWNLOAD_PATH}: {e}")

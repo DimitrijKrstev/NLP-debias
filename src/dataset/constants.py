@@ -3,6 +3,7 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 
+DATASET_NAME = "chandiragunatilleke/wiki-neutrality-corpus"
 DATASET_DOWNLOAD_PATH = PROJECT_ROOT / "dataset"
 DATASET_PATH = DATASET_DOWNLOAD_PATH / "WNC" / "WNC"
 
