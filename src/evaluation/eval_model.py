@@ -5,8 +5,8 @@ from peft import PeftModel
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from dataset.constants import WNCColumn
-from dataset.preprocess import get_test_dataset
+from dataset.enums import DatasetSplit, TokenizationType, WNCColumn
+from dataset.preprocess import get_dataset_split
 from evaluation.utils import compute_metrics, debias_text
 from utils import load_model, load_tokenizer
 
@@ -26,7 +26,7 @@ def evaluate_model(model_tokenizer_path: str, model_name: str) -> None:
     model.eval()
 
     logger.info("Loading test dataset...")
-    test_dataset = get_test_dataset(tokenizer)
+    test_dataset = get_dataset_split(DatasetSplit.TEST, TokenizationType.SFT, tokenizer)
 
     logger.info(f"Evaluating on {len(test_dataset)} examples...")
 

@@ -5,7 +5,8 @@ import mlflow
 from transformers import DataCollatorForLanguageModeling, Trainer
 
 from constants import TRAIN_OUTPUT_DIR
-from dataset.preprocess import get_train_val_split
+from dataset.enums import DatasetSplit, TokenizationType
+from dataset.preprocess import get_dataset_split
 from utils import get_training_args, load_peft_model, load_tokenizer
 
 environ["TOKENIZERS_PARALLELISM"] = "false"
@@ -26,7 +27,12 @@ def train_model(
     model.train()
 
     logger.info("Loading and pre-processing dataset")
-    train_dataset, val_dataset = get_train_val_split(tokenizer)
+    train_dataset = get_dataset_split(
+        DatasetSplit.TRAIN, TokenizationType.SFT, tokenizer
+    )
+    val_dataset = get_dataset_split(
+        DatasetSplit.VALIDATION, TokenizationType.SFT, tokenizer
+    )
     data_collator = DataCollatorForLanguageModeling(
         tokenizer=tokenizer,
         mlm=False,
