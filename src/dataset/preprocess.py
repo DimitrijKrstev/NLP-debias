@@ -7,81 +7,48 @@ from pandas import DataFrame, read_csv
 from constants import GRPO_SYSTEM_PROMPT
 from dataset.constants import (
     DATASET_PATH,
+    DATASET_SLICE_BY_SPLIT_TYPE,
     TRAINING_PROMPT,
     WNC_COLUMNS,
-    WNCColumn,
 )
+from dataset.enums import DatasetSplit, TokenizationType, WNCColumn
 
 logger = getLogger(__name__)
 
 
-def get_dataset_slice(
-    tokenizer: Any,
-    start_idx: int = 0,
-    end_idx: int | None = None,
-    is_rl: bool = False,
+def get_dataset_split(
+    dataset_split: DatasetSplit, tokenization_type: TokenizationType, tokenizer: Any
 ) -> Dataset:
-    dataset = load_wnc_from_csv()
+    dataset = get_preprocessed_dataset_slice(DATASET_SLICE_BY_SPLIT_TYPE[dataset_split])
+    tokenized_dataset = TOKENIZE_FUNCTION_BY_TYPE[tokenization_type](dataset, tokenizer)
 
-    if end_idx is not None:
-        dataset = dataset.iloc[start_idx:end_idx]
-    else:
-        dataset = dataset.iloc[start_idx:]
-
-    preprocessed_dataframe = preprocess_data(dataset)
-    processed_dataset = Dataset.from_pandas(preprocessed_dataframe)
-
-    if is_rl:
-        tokenized_dataset = processed_dataset.map(
-            lambda data: map_grpo_data(data),
-            batched=False,
-        )
-    else:
-        tokenized_dataset = processed_dataset.map(
-            lambda data: tokenize_data(data, tokenizer),
-            batched=True,
-            remove_columns=processed_dataset.column_names,
-        )
-
-    logger.info(f"Loaded {len(processed_dataset)} examples")
+    logger.info(
+        f"Loaded {len(tokenized_dataset)} examples for {dataset_split} split and {tokenization_type} task"
+    )
 
     return tokenized_dataset
 
 
-def get_train_dataset(tokenizer: Any, is_rl: bool = False) -> Dataset:
-    return get_dataset_slice(tokenizer, end_idx=3000, is_rl=is_rl)
+def get_preprocessed_dataset_slice(slice: slice) -> Dataset:
+    dataset = load_wnc_from_csv()
+    sliced_dataset = dataset.iloc[slice]
 
+    preprocessed_dataframe = preprocess_data(sliced_dataset)
+    processed_dataset = Dataset.from_pandas(preprocessed_dataframe)
 
-def get_test_dataset(tokenizer: Any, is_rl: bool = False) -> Dataset:
-    return get_dataset_slice(tokenizer, start_idx=-1000, end_idx=None, is_rl=is_rl)
-
-
-def get_train_val_split(tokenizer: Any) -> tuple[Dataset, Dataset]:
-    train_val_sep_idx = int(0.9 * 3000)
-
-    train_dataset = get_dataset_slice(tokenizer, end_idx=train_val_sep_idx)
-    val_dataset = get_dataset_slice(
-        tokenizer, start_idx=train_val_sep_idx, end_idx=3000
-    )
-
-    logger.info(
-        f"Loaded {len(train_dataset)} training examples and {len(val_dataset)} validation examples"
-    )
-
-    return train_dataset, val_dataset
+    return processed_dataset
 
 
 def load_wnc_from_csv() -> DataFrame:
-    dataset_path = DATASET_PATH
-
-    main_file = dataset_path / "biased.full"
-    if not main_file.exists():
+    if not DATASET_PATH.exists():
         raise FileNotFoundError(
-            f"No file named 'biased.full' found at {main_file}, have you ran download-dataset?"
+            f"No file named 'biased.full' found at {DATASET_PATH}, have you ran download-dataset?"
         )
-    logger.info(f"Loading dataset from {main_file}")
+    logger.info(f"Loading dataset from {DATASET_PATH}")
 
-    return read_csv(main_file, delimiter="\t", on_bad_lines="warn", names=WNC_COLUMNS)
+    return read_csv(
+        DATASET_PATH, delimiter="\t", on_bad_lines="warn", names=WNC_COLUMNS
+    )
 
 
 def preprocess_data(dataframe: DataFrame) -> DataFrame:
@@ -93,9 +60,7 @@ def preprocess_data(dataframe: DataFrame) -> DataFrame:
         columns={"src_raw": WNCColumn.BIASED, "tgt_raw": WNCColumn.NEUTRAL}
     )
 
-    dataframe = dataframe.dropna(subset=[WNCColumn.BIASED, WNCColumn.NEUTRAL])
-
-    return dataframe
+    return dataframe.dropna(subset=[WNCColumn.BIASED, WNCColumn.NEUTRAL])
 
 
 def tokenize_data(batch: dict, tokenizer: Any) -> dict:
@@ -157,3 +122,24 @@ def map_grpo_data(sample: dict) -> dict:
             {"role": "assistant", "content": " "},
         ],
     }
+
+
+def tokenize_for_sft(dataset: Dataset, tokenizer: Any) -> Dataset:
+    return dataset.map(
+        lambda data: tokenize_data(data, tokenizer),
+        batched=True,
+        remove_columns=dataset.column_names,
+    )
+
+
+def tokenize_for_grpo(dataset: Dataset, _) -> Dataset:
+    return dataset.map(
+        lambda data: map_grpo_data(data),
+        batched=False,
+    )
+
+
+TOKENIZE_FUNCTION_BY_TYPE = {
+    TokenizationType.SFT: tokenize_for_sft,
+    TokenizationType.GRPO: tokenize_for_grpo,
+}

@@ -10,7 +10,7 @@ from openai import OpenAI
 from trl.trainer.grpo_config import GRPOConfig
 
 from constants import JUDGE_SCORE_FILE
-from dataset.constants import WNCColumn
+from dataset.enums import WNCColumn
 from rl.models import ModelResponseEvaluation
 from rl.prompt import build_judge_prompt, get_judge_instructions
 
