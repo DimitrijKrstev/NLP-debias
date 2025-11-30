@@ -16,7 +16,8 @@ WNC_COLUMNS = [
     "src_POS_tags",
     "tgt_parse_tags",
 ]
-TRAINING_PROMPT = "You are an expert at text style transfer. Your task is to transform text from biased to neutral."
+
+TRAINING_PROMPT = "You are an expert at text style transfer. Your task is to transform biased text into neutral text. Respond only with the neutral version."
 
 INSTRUCTION_PROMPT = "You are an expert at text style transfer. Your task is to transform text from biased to neutral."
 

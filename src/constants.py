@@ -2,7 +2,7 @@ from pathlib import Path
 
 SFT_RL_CUTOFF = 0.9
 
-TRAIN_OUTPUT_DIR = "./output"
+TRAIN_OUTPUT_DIR = Path("./output")
 
 RL_OUTPUT_DIR = Path("rl_output/")
 RL_CACHE_FILE = RL_OUTPUT_DIR / "judge_cache.jsonl"

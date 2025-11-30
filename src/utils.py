@@ -5,6 +5,7 @@ from typing import Any
 
 import torch
 from peft import (
+    AutoPeftModelForCausalLM,
     LoraConfig,
     TaskType,
     get_peft_model,
@@ -18,24 +19,58 @@ from transformers import (
     TrainingArguments,
 )
 
-from constants import TRAIN_OUTPUT_DIR
-
 HF_TOKEN = os.getenv("HF_TOKEN")
 
 
 logger = getLogger(__name__)
 
 
-def load_peft_model(model_name: str, quantize: bool) -> Any:
+def load_peft_model(model_name: str, quantize: bool = True) -> Any:
     logger.info(f"Loading model: {model_name}")
+    model_path = Path(model_name)
 
+    if model_path.exists() and (model_path / "adapter_config.json").exists():
+        logger.info("Detected PEFT adapter checkpoint")
+
+        bnb_config = (
+            BitsAndBytesConfig(
+                load_in_4bit=True,
+                bnb_4bit_use_double_quant=True,
+                bnb_4bit_quant_type="nf4",
+                bnb_4bit_compute_dtype=torch.bfloat16,
+            )
+            if quantize
+            else None
+        )
+
+        model = AutoPeftModelForCausalLM.from_pretrained(
+            model_path,
+            device_map="auto",
+            quantization_config=bnb_config,
+            torch_dtype=torch.bfloat16,
+            trust_remote_code=True,
+            is_trainable=True,
+            offload_buffers=True,
+            offload_folder="offload",
+        )
+
+        model.gradient_checkpointing_disable()
+        model.config.use_cache = False
+
+        if quantize:
+            model = prepare_model_for_kbit_training(model)
+
+        model.print_trainable_parameters()
+        return model
+
+    # 🔹 CASE 2: initial SFT (fresh LoRA)
     model = load_model(model_name, quantize)
 
     if quantize:
         logger.info("Preparing model for k-bit training")
         model = prepare_model_for_kbit_training(model)
 
-    logger.info("Applying LoRA configuration")
+    logger.info("Applying LoRA configuration (fresh)")
     lora_config = LoraConfig(
         task_type=TaskType.CAUSAL_LM,
         inference_mode=False,
@@ -52,6 +87,7 @@ def load_peft_model(model_name: str, quantize: bool) -> Any:
             "down_proj",
         ],
     )
+
     model = get_peft_model(model, lora_config)
     model.print_trainable_parameters()
 
@@ -105,7 +141,7 @@ def load_tokenizer(model_name: str | Path) -> Any:
 
 def get_training_args() -> TrainingArguments:
     return TrainingArguments(
-        output_dir=TRAIN_OUTPUT_DIR,
+        output_dir="./output",
         overwrite_output_dir=True,
         num_train_epochs=3,
         per_device_train_batch_size=8,
