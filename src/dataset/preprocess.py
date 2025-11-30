@@ -4,7 +4,6 @@ from typing import Any
 from datasets import Dataset  # type: ignore[import-untyped]
 from pandas import DataFrame, read_csv
 
-from constants import GRPO_SYSTEM_PROMPT
 from dataset.constants import (
     DATASET_PATH,
     TRAINING_PROMPT,
@@ -140,20 +139,19 @@ def tokenize_data(batch: dict, tokenizer: Any) -> dict:
     return {
         "input_ids": input_ids,
         "labels": labels,
-        "attention_mask": [[1] * len(ids) for ids in input_ids],
+        "attention_mask": [
+            [1 if token != tokenizer.pad_token_id else 0 for token in ids]
+            for ids in input_ids
+        ],
         "biased": batch[WNCColumn.BIASED],
         "neutral": batch[WNCColumn.NEUTRAL],
     }
 
 
 def map_grpo_data(sample: dict) -> dict:
+    prompt = f"{TRAINING_PROMPT}:\nBiased text: {sample[WNCColumn.BIASED]}"
     return {
-        "prompt": [
-            {"role": "system", "content": GRPO_SYSTEM_PROMPT},
-            {
-                "role": "user",
-                "content": f"Make this neutral: {sample[WNCColumn.BIASED]}",
-            },
-            {"role": "assistant", "content": " "},
-        ],
+        "prompt": prompt,
+        WNCColumn.BIASED: sample[WNCColumn.BIASED],
+        WNCColumn.NEUTRAL: sample[WNCColumn.NEUTRAL],
     }

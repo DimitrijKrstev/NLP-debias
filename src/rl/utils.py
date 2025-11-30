@@ -17,7 +17,7 @@ from rl.prompt import build_judge_prompt, get_judge_instructions
 logger = getLogger(__name__)
 
 load_dotenv()
-OPENAI_KEY = getenv("OPENAI_API_KEY")
+OPENAI_KEY = getenv("OPENAI_API_KEY_2")
 client = OpenAI(api_key=OPENAI_KEY)
 
 

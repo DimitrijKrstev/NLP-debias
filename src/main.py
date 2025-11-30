@@ -1,9 +1,13 @@
 from logging import INFO, basicConfig, getLogger
+from pathlib import Path
+from typing import Optional
 
 import typer
 
+from constants import TRAIN_OUTPUT_DIR
 from dataset.download import download_wnc
 from evaluation.eval_model import evaluate_model
+from rl.hybrid_model import run_hybrid_sft_grpo_sft
 from rl.main import run_rlhf_training
 from rl.utils import get_judge_score
 from train import train_model
@@ -50,6 +54,23 @@ def train_rl_model(
         model_name,
         mflow_experiment,
         quantize,
+    )
+
+
+@app.command()
+def train_hybrid_model(
+    mlflow_experiment: str = "Hybrid-NLP-Debias",
+    quantize: bool = False,
+    generated_output_csv: str = "grpo_generated_outputs.csv",
+    sft_after_grpo_dir: str | Path = Path(TRAIN_OUTPUT_DIR) / "sft-after-grpo",
+    generation_limit: Optional[int] = None,
+) -> None:
+    run_hybrid_sft_grpo_sft(
+        mlflow_experiment,
+        quantize,
+        generated_output_csv,
+        sft_after_grpo_dir,
+        generation_limit,
     )
 
 
