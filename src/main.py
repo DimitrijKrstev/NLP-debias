@@ -6,6 +6,7 @@ from dataset.download import download_wnc
 from evaluation.eval_model import evaluate_model
 from rl.main import run_rlhf_training
 from rl.utils import get_judge_score
+from rl.hybrid_model import run_hybrid_training
 from train import train_model
 
 app = typer.Typer(pretty_exceptions_enable=False)
@@ -51,6 +52,25 @@ def train_rl_model(
         mflow_experiment,
         quantize,
     )
+
+@app.command()
+def train_hybrid_model(
+    model_name: str = "Qwen/Qwen3-4B",
+    mlflow_experiment: str = "Hybrid-NLP-Debias",
+    quantize: bool = True,
+    cycles: int = 3,
+    grpo_steps: int = 50,
+    dpo_epochs: int = 1,
+) -> None:
+    run_hybrid_training(
+        model_name=model_name,
+        mlflow_experiment=mlflow_experiment,
+        quantize=quantize,
+        cycles=cycles,
+        grpo_steps_per_cycle=grpo_steps,
+        dpo_epochs=dpo_epochs,
+    )
+
 
 
 @app.command()
