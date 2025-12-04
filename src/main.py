@@ -5,8 +5,8 @@ import typer
 from dataset.download import download_wnc
 from evaluation.eval_model import evaluate_model
 from rl.main import run_rlhf_training
-from rl.utils import get_judge_score
-from train import train_model
+from judge.main import get_judge_score
+from sft.train import train_model
 
 app = typer.Typer(pretty_exceptions_enable=False)
 

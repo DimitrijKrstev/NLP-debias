@@ -13,10 +13,12 @@ uv sync
 Set up environment variables:
 
 ```bash
-# Create .env file
-echo "HF_TOKEN=your_huggingface_token" >> .env
-echo "OPENAI_API_KEY=your_openai_key" >> .env
+copy .env.sample .env
 ```
+
+After creating the .env file enter the subsequent fields. The hugging face token is optional and only applies for certain models.
+
+For Judge scroing (both in RL and evaluation), defining either the `OPENROUTER_API_KEY` (any LLM) or `OPENAI_API_KEY` (OpenAI specific models) is mandatory. If both are defined, Open Router takes precedence.
 
 ## Usage
 

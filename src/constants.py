@@ -1,12 +1,16 @@
 from pathlib import Path
 
+from evaluation.constants import EVAL_DIR
+
 SFT_RL_CUTOFF = 0.9
 
 TRAIN_OUTPUT_DIR = "./output"
 
 RL_OUTPUT_DIR = Path("rl_output/")
 RL_CACHE_FILE = RL_OUTPUT_DIR / "judge_cache.jsonl"
-JUDGE_SCORE_FILE = RL_OUTPUT_DIR / "judge_scores.csv"
+RL_JUDGE_SCORE_FILE = RL_OUTPUT_DIR / "judge_scores.csv"
+
+EVAL_JUDGE_SCORE_FILE = EVAL_DIR / "judge_scores.csv"
 
 GRPO_SYSTEM_PROMPT = """You are an expert text debiaser. Your task is to transform biased sentences into neutral, unbiased versions.
 

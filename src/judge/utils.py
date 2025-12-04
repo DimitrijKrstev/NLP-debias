@@ -1,0 +1,77 @@
+from csv import DictWriter
+from pathlib import Path
+from instructor import from_openai
+from openai import OpenAI
+from logging import getLogger
+from os import getenv
+
+from dotenv import load_dotenv
+
+from judge.utils import get_instructor_client
+
+logger = getLogger(__name__)
+
+
+load_dotenv()
+
+OPENAI_KEY = getenv("OPENAI_API_KEY")
+OPENROUTER_KEY = getenv("OPENROUTER_API_KEY")
+
+CLIENT = get_instructor_client()
+
+
+def get_instructor_client():
+    if OPENROUTER_KEY:
+        return from_openai(
+            OpenAI(
+                base_url="https://openrouter.ai/api/v1",
+                api_key=OPENROUTER_KEY,
+            )
+        )
+
+    if not OPENAI_KEY:
+        raise ValueError(
+            "Neither OPENROUTER_API_KEY nor OPENAI_API_KEY is specified in environment variables. "
+            "Provide one for Judge API access. OPENROUTER takes precedence."
+        )
+    return from_openai(OpenAI(api_key=OPENAI_KEY))
+
+
+def build_judge_prompt(biased_text: str, model_output: str, reference_text: str) -> str:
+    return f"""
+        BIAS INPUT:
+        {biased_text}
+
+        MODEL OUTPUT:
+        {model_output}
+
+        REFERENCE (human neutral text):
+        {reference_text}
+        """
+
+
+def append_results_to_csv(
+    biased_text: str,
+    model_output: str,
+    reference_text: str,
+    score: float | None,
+    path: Path,
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    file_exists = path.is_file()
+
+    with open(path, mode="a", newline="", encoding="utf-8") as csvfile:
+        fieldnames = ["biased_text", "model_output", "reference_text", "score"]
+        writer = DictWriter(csvfile, fieldnames=fieldnames)
+
+        if not file_exists:
+            writer.writeheader()
+
+        writer.writerow(
+            {
+                "biased_text": biased_text,
+                "model_output": model_output,
+                "reference_text": reference_text,
+                "score": score,
+            }
+        )

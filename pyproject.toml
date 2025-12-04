@@ -27,6 +27,7 @@ dependencies = [
     "nltk>=3.9.2",
     "rouge-score>=0.1.2",
     "openai>=2.3.0",
+    "instructor>=1.0.0",
     "typer>=0.19.2",
     "types-tqdm>=4.67.0.20250809",
     "bert-score>=0.3.13",

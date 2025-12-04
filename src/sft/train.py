@@ -7,7 +7,8 @@ from transformers import DataCollatorForLanguageModeling, Trainer
 from constants import TRAIN_OUTPUT_DIR
 from dataset.enums import DatasetSplit, TokenizationType
 from dataset.preprocess import get_dataset_split
-from utils import get_training_args, load_peft_model, load_tokenizer
+from sft.utils import get_training_args
+from utils import load_peft_model, load_tokenizer
 
 environ["TOKENIZERS_PARALLELISM"] = "false"
 
@@ -26,7 +27,6 @@ def train_model(
     tokenizer = load_tokenizer(model_name)
     model.train()
 
-    logger.info("Loading and pre-processing dataset")
     train_dataset = get_dataset_split(
         DatasetSplit.TRAIN, TokenizationType.SFT, tokenizer
     )

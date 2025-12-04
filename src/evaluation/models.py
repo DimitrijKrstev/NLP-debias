@@ -10,6 +10,7 @@ class Metrics:
     rougeL: float
     semantic_similarity: float
     bertscore_f1: float
+    judge_score: float
 
     @classmethod
     def from_scores(
@@ -19,6 +20,7 @@ class Metrics:
         rouge_scores: dict | None,
         semantic_sim: float,
         bertscore_f1: float,
+        judge_score: float,
     ) -> "Metrics":
         return cls(
             bleu=bleu_score["bleu"] * 100 if bleu_score else -1.0,
@@ -28,4 +30,5 @@ class Metrics:
             rougeL=rouge_scores["rougeL"] * 100 if rouge_scores else -1.0,
             semantic_similarity=semantic_sim * 100,
             bertscore_f1=bertscore_f1 * 100,
+            judge_score=judge_score,
         )

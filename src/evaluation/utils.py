@@ -1,3 +1,4 @@
+from logging import getLogger
 import os
 
 import torch
@@ -6,11 +7,19 @@ from sentence_transformers import SentenceTransformer, util
 
 from constants import GRPO_SYSTEM_PROMPT
 from evaluation.models import Metrics
+from judge.main import get_judge_score
 
 os.environ["MPLBACKEND"] = "Agg"
 
+logger = getLogger(__name__)
 
-def compute_metrics(predictions: list[str], references: list[str]) -> Metrics:
+
+def compute_metrics(
+    biased_references: list[str],
+    references: list[str],
+    predictions: list[str],
+    judge_model_name: str,
+) -> Metrics:
     bleu = evaluate_load("bleu")
     meteor = evaluate_load("meteor")
     rouge = evaluate_load("rouge")
@@ -29,7 +38,19 @@ def compute_metrics(predictions: list[str], references: list[str]) -> Metrics:
     pred_emb = similarity_model.encode(predictions, convert_to_tensor=True)
     ref_emb = similarity_model.encode(references, convert_to_tensor=True)
     semantic_sim = util.cos_sim(pred_emb, ref_emb).diagonal().mean().item()
-    bertscore_f1 = sum(bertscore_result["f1"]) / len(bertscore_result["f1"])
+
+    if bertscore_result and bertscore_result.get("f1"):
+        bertscore_f1 = sum(bertscore_result["f1"]) / len(bertscore_result["f1"])
+    else:
+        bertscore_f1 = 0.0
+        logger.warning(
+            f"BERTScore F1 cannot be computed for predictions and references. \n\n"
+            "Predictions: \n{predictions}, \n\nReferences: \n{references}"
+        )
+
+    judge_score = get_judge_score(
+        biased_references, predictions, references, judge_model_name
+    )
 
     return Metrics.from_scores(
         bleu_score=bleu_score,
@@ -37,6 +58,7 @@ def compute_metrics(predictions: list[str], references: list[str]) -> Metrics:
         rouge_scores=rouge_scores,
         semantic_sim=semantic_sim,
         bertscore_f1=bertscore_f1,
+        judge_score=judge_score,
     )
 
 
