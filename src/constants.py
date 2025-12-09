@@ -8,7 +8,9 @@ TRAIN_OUTPUT_DIR = "./output"
 
 RL_OUTPUT_DIR = Path("rl_output/")
 RL_CACHE_FILE = RL_OUTPUT_DIR / "judge_cache.jsonl"
-RL_JUDGE_SCORE_FILE = RL_OUTPUT_DIR / "judge_scores.csv"
+
+JUDGE_OUTPUT_DIR = Path("judge_output/")
+JUDGE_SCORE_FILE = "judge_scores.csv"
 
 EVAL_JUDGE_SCORE_FILE = EVAL_DIR / "judge_scores.csv"
 

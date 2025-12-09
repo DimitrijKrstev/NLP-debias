@@ -1,17 +1,26 @@
-from pathlib import Path
-from constants import RL_JUDGE_SCORE_FILE
-from judge.utils import CLIENT, append_results_to_csv, build_judge_prompt
+from logging import getLogger
+
+from constants import JUDGE_OUTPUT_DIR
 from judge.constants import JUDGE_INSTRUCTIONS
 from judge.models import ModelResponseEvaluation
-from rl.utils import logger
+from judge.utils import (
+    append_results_to_csv,
+    build_judge_prompt,
+    get_instructor_client,
+)
+
+logger = getLogger(__name__)
+
+
+CLIENT = get_instructor_client()
 
 
 def get_judge_score(
     biased_text: str,
     model_output: str,
     reference_text: str,
-    model: str = "gpt-5-mini",
-    score_path: Path | None = RL_JUDGE_SCORE_FILE,
+    model: str,
+    score_file_name: str | None,
 ) -> float:
     instructions = JUDGE_INSTRUCTIONS
     prompt = build_judge_prompt(biased_text, model_output, reference_text)
@@ -42,9 +51,13 @@ def get_judge_score(
         f"Fluency:{score.fluency}"
     )
 
-    if score_path:
+    if score_file_name:
+        output_file_path = (
+            JUDGE_OUTPUT_DIR
+            / f"{score_file_name.replace(".", "").replace("/", "_").replace(" ", "_")}.csv"
+        )
         append_results_to_csv(
-            biased_text, model_output, reference_text, total_score, score_path
+            biased_text, model_output, reference_text, score, output_file_path
         )
 
     return total_score

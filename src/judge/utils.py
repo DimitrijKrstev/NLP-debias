@@ -1,13 +1,13 @@
 from csv import DictWriter
-from pathlib import Path
-from instructor import from_openai
-from openai import OpenAI
 from logging import getLogger
 from os import getenv
+from pathlib import Path
 
 from dotenv import load_dotenv
+from instructor import from_openai
+from openai import OpenAI
 
-from judge.utils import get_instructor_client
+from judge.models import ModelResponseEvaluation
 
 logger = getLogger(__name__)
 
@@ -16,8 +16,6 @@ load_dotenv()
 
 OPENAI_KEY = getenv("OPENAI_API_KEY")
 OPENROUTER_KEY = getenv("OPENROUTER_API_KEY")
-
-CLIENT = get_instructor_client()
 
 
 def get_instructor_client():
@@ -54,14 +52,25 @@ def append_results_to_csv(
     biased_text: str,
     model_output: str,
     reference_text: str,
-    score: float | None,
+    score: ModelResponseEvaluation,
     path: Path,
 ) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     file_exists = path.is_file()
 
     with open(path, mode="a", newline="", encoding="utf-8") as csvfile:
-        fieldnames = ["biased_text", "model_output", "reference_text", "score"]
+        fieldnames = [
+            "model_output",
+            "neutrality",
+            "meaning_preservation",
+            "fluency",
+            "faithfulness_to_reference",
+            "edit_minimality",
+            "total_score",
+            "biased_text",
+            "reference_text",
+            "overall_reasoning",
+        ]
         writer = DictWriter(csvfile, fieldnames=fieldnames)
 
         if not file_exists:
@@ -69,9 +78,15 @@ def append_results_to_csv(
 
         writer.writerow(
             {
-                "biased_text": biased_text,
                 "model_output": model_output,
+                "neutrality": score.neutrality,
+                "meaning_preservation": score.meaning_preservation,
+                "fluency": score.fluency,
+                "faithfulness_to_reference": score.faithfulness_to_reference,
+                "edit_minimality": score.edit_minimality,
+                "total_score": score.get_normalized_full_score(),
+                "biased_text": biased_text,
                 "reference_text": reference_text,
-                "score": score,
+                "overall_reasoning": score.overall_reasoning,
             }
         )

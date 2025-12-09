@@ -3,6 +3,7 @@ from logging import getLogger
 
 from trl.trainer.grpo_config import GRPOConfig
 
+from constants import JUDGE_SCORE_FILE
 from dataset.enums import WNCColumn
 from judge.main import get_judge_score
 
@@ -24,9 +25,7 @@ def reward_func(
     ):
         model_output = remove_thinking_tags(completion[0]["content"])
         score = get_judge_score(
-            biased_text=biased_text,
-            model_output=model_output,
-            reference_text=neutral_text,
+            biased_text, model_output, neutral_text, "gpt-5-mini", JUDGE_SCORE_FILE
         )
 
         rewards.append(score)

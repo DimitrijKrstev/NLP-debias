@@ -7,7 +7,7 @@ class ModelResponseEvaluation(BaseModel):
     fluency: int
     faithfulness_to_reference: int
     edit_minimality: int
-    overall_reasoning: str
+    overall_reasoning: str | None
 
     @field_validator(
         "neutrality",
@@ -26,6 +26,6 @@ class ModelResponseEvaluation(BaseModel):
             self.neutrality
             + self.meaning_preservation
             + (self.fluency * 0.5)
-            + self.faithfulness_to_reference
+            + (self.faithfulness_to_reference * 0.5)
             + (self.edit_minimality * 0.5)
-        ) / 40.0
+        ) / 35.0

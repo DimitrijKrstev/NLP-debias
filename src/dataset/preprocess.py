@@ -52,15 +52,14 @@ def load_wnc_from_csv() -> DataFrame:
 
 
 def preprocess_data(dataframe: DataFrame) -> DataFrame:
-    dataframe.drop(
-        columns=["id", "src_tok", "tgt_tok", "tgt_parse_tags", "src_POS_tags"],
-        inplace=True,
+    reduced_dataframe = dataframe.drop(
+        columns=["id", "src_tok", "tgt_tok", "tgt_parse_tags", "src_POS_tags"]
     )
-    dataframe = dataframe.rename(
+    reduced_dataframe = reduced_dataframe.rename(
         columns={"src_raw": WNCColumn.BIASED, "tgt_raw": WNCColumn.NEUTRAL}
     )
 
-    return dataframe.dropna(subset=[WNCColumn.BIASED, WNCColumn.NEUTRAL])
+    return reduced_dataframe.dropna(subset=[WNCColumn.BIASED, WNCColumn.NEUTRAL])
 
 
 def tokenize_data(batch: dict, tokenizer: Any) -> dict:

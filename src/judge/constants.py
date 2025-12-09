@@ -11,8 +11,8 @@ you should still provide fair and independent judgments for each metric
 based primarily on the model output's own quality.
 
 Return your response as strict JSON with:
-- a numeric score for each metric, and
-- one concise "overall_reasoning" sentence summarizing the overall assessment.
+- A numeric score for each metric
+- Include one short and concise "overall_reasoning" sentence summarizing the overall assessment if it is overwhelmingly positive or negative.
 
 Metrics to score (-10 to 10):
 1. Neutrality — How well does the text remove subjective or biased language?

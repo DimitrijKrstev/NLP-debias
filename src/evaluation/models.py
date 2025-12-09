@@ -32,3 +32,15 @@ class Metrics:
             bertscore_f1=bertscore_f1 * 100,
             judge_score=judge_score,
         )
+
+    def to_dict(self) -> dict[str, float]:
+        return {
+            "bleu": self.bleu,
+            "meteor": self.meteor,
+            "rouge1": self.rouge1,
+            "rouge2": self.rouge2,
+            "rougeL": self.rougeL,
+            "semantic_similarity": self.semantic_similarity,
+            "bertscore_f1": self.bertscore_f1,
+            "judge_score": self.judge_score,
+        }

@@ -4,13 +4,13 @@ import typer
 
 from dataset.download import download_wnc
 from evaluation.eval_model import evaluate_model
-from rl.main import run_rlhf_training
 from judge.main import get_judge_score
+from rl.main import run_rlhf_training
 from sft.train import train_model
 
 app = typer.Typer(pretty_exceptions_enable=False)
 
-basicConfig(level=INFO)
+basicConfig(level=INFO, format="%(levelname)s - %(filename)s:%(lineno)d - %(message)s")
 logger = getLogger(__name__)
 
 
@@ -35,9 +35,13 @@ def sft_train_model(
 def eval_model(
     model_tokenizer_path: str = "grpo-debiasing-model/checkpoint-2200",
     model_name: str = "Qwen/Qwen3-4B",
+    judge_model_name: str = "google/gemini-2.5-flash",
+    mlflow_experiment: str = "NLP-Debias-Eval",
 ) -> None:
     logger.info(f"Evaluating model: {model_name}")
-    evaluate_model(model_tokenizer_path, model_name)
+    evaluate_model(
+        model_tokenizer_path, model_name, judge_model_name, mlflow_experiment
+    )
 
 
 @app.command()
@@ -54,13 +58,14 @@ def train_rl_model(
 
 
 @app.command()
-def test_openai(open_ai_remote_model_name: str = "gpt-5-mini") -> None:
+def test_judge(open_ai_remote_model_name: str = "gpt-5-mini") -> None:
     logger.info(
         get_judge_score(
             "during the campaign , controversy erupted over alleged differences between pali ##n ' s positions as a gubernatorial candidate and her position as a vice - presidential candidate .",
-            "during the campaign , some pointed out alleged differences between pali ##n ' s positions as a gubernatorial candidate and her position as a vice - presidential candidate .	",
+            "<|im_end|>",
             "during the campaign, some pointed out alleged differences between pali's positions as a gubernatorial candidate and her position as a vice - presidential candidate.",
             open_ai_remote_model_name,
+            None,
         )
     )
 

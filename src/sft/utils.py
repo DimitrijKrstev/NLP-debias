@@ -1,7 +1,6 @@
-from constants import TRAIN_OUTPUT_DIR
-
-
 from transformers import TrainingArguments
+
+from constants import TRAIN_OUTPUT_DIR
 
 
 def get_training_args() -> TrainingArguments:
