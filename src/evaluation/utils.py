@@ -101,8 +101,6 @@ def debias_text(texts: list[str], model, tokenizer, max_length: int = 256) -> li
         add_generation_prompt=True,
     )
 
-    logger.info(f"Example formatted prompt: {formatted_prompts[0] if formatted_prompts else 'None'}")
-
     inputs = tokenizer(
         formatted_prompts,
         return_tensors="pt",
@@ -114,10 +112,10 @@ def debias_text(texts: list[str], model, tokenizer, max_length: int = 256) -> li
     with torch.no_grad():
         outputs = model.generate(
             **inputs,
-            max_new_tokens=256,
-            do_sample=False,
-            temperature=None,
-            top_p=None,
+            max_new_tokens=1024,
+            do_sample=True,
+            temperature=0.7,
+            top_p=0.9,
             pad_token_id=tokenizer.eos_token_id,
             eos_token_id=tokenizer.eos_token_id,
         )
@@ -127,11 +125,7 @@ def debias_text(texts: list[str], model, tokenizer, max_length: int = 256) -> li
 
     decoded_outputs = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
 
-    logger.info(f"Example raw output: '{decoded_outputs[0] if decoded_outputs else 'None'}'")
-
     predicted_texts = [_clean_output(text) for text in decoded_outputs]
-
-    logger.info(f"Example cleaned output: '{predicted_texts[0] if predicted_texts else 'None'}'")
 
     return predicted_texts
 
@@ -147,6 +141,19 @@ def _clean_output(text: str) -> str:
     if "</think>" in text:
         text = text.split("</think>")[-1]
     elif "<think>" in text:
-        text = text.split("<think>")[0]
+        # If there's incomplete thinking, try to extract any content after it
+        parts = text.split("<think>", 1)
+        if len(parts) > 1:
+            # Look for actual content after thinking
+            after_think = parts[1]
+            # Try to find where actual response might start
+            lines = after_think.split("\n")
+            for line in lines:
+                line = line.strip()
+                if line and not line.startswith(
+                    ("Okay", "Let me", "I need to", "First", "The user")
+                ):
+                    return line
+        text = parts[0]  # fallback to text before <think>
 
-    return text
+    return text.strip()

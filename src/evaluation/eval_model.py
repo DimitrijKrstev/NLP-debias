@@ -95,7 +95,7 @@ def _generate_predictions(
 
     eval_results_path = (
         EVAL_DIR
-        / f"{model_tokenizer_path.replace(".","").replace("/", "_").replace(" ", "_")}.csv"
+        / f"{model_tokenizer_path.replace(".", "").replace("/", "_").replace(" ", "_")}.csv"
     )
     eval_results_path.parent.mkdir(parents=True, exist_ok=True)
 
