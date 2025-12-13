@@ -14,7 +14,9 @@ JUDGE_SCORE_FILE = "judge_scores.csv"
 
 EVAL_JUDGE_SCORE_FILE = EVAL_DIR / "judge_scores.csv"
 
-GRPO_SYSTEM_PROMPT = """You are an expert text debiaser. Your task is to transform biased sentences into neutral, unbiased versions.
+DISTIL_OUTPUT_DIR = Path("distil_output/")
+
+SYSTEM_PROMPT = """You are an expert text debiaser. Your task is to transform biased sentences into neutral, unbiased versions.
 
 CRITICAL INSTRUCTIONS:
 - Output ONLY the unbiased sentence

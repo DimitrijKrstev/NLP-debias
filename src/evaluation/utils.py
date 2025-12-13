@@ -7,7 +7,7 @@ from numpy import average
 from sentence_transformers import SentenceTransformer, util
 from tqdm import tqdm
 
-from constants import GRPO_SYSTEM_PROMPT
+from constants import SYSTEM_PROMPT
 from evaluation.models import Metrics
 from judge.main import get_judge_score
 
@@ -132,7 +132,7 @@ def debias_text(texts: list[str], model, tokenizer, max_length: int = 256) -> li
 
 def _make_chat_prompt(biased_text: str) -> list[dict]:
     return [
-        {"role": "system", "content": GRPO_SYSTEM_PROMPT},
+        {"role": "system", "content": SYSTEM_PROMPT},
         {"role": "user", "content": f"Make this neutral: {biased_text}"},
     ]
 
@@ -141,12 +141,9 @@ def _clean_output(text: str) -> str:
     if "</think>" in text:
         text = text.split("</think>")[-1]
     elif "<think>" in text:
-        # If there's incomplete thinking, try to extract any content after it
         parts = text.split("<think>", 1)
         if len(parts) > 1:
-            # Look for actual content after thinking
             after_think = parts[1]
-            # Try to find where actual response might start
             lines = after_think.split("\n")
             for line in lines:
                 line = line.strip()
@@ -154,6 +151,6 @@ def _clean_output(text: str) -> str:
                     ("Okay", "Let me", "I need to", "First", "The user")
                 ):
                     return line
-        text = parts[0]  # fallback to text before <think>
+        text = parts[0]
 
     return text.strip()

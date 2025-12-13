@@ -22,6 +22,6 @@ INSTRUCTION_PROMPT = "You are an expert at text style transfer. Your task is to 
 
 DATASET_SLICE_BY_SPLIT_TYPE = {
     DatasetSplit.TRAIN: slice(0, 3000),
-    DatasetSplit.VALIDATION: slice(3000, 3500),
+    DatasetSplit.VALIDATION: slice(3000, 3300),
     DatasetSplit.TEST: slice(-300, None),
 }

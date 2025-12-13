@@ -24,6 +24,7 @@ def evaluate_model(
     model_tokenizer_path: str,
     model_name: str,
     judge_model_name: str,
+    tokenization_type: TokenizationType,
     mlflow_experiment: str = "NLP-Debias-Eval",
 ) -> None:
     mlflow.set_experiment(mlflow_experiment)
@@ -59,7 +60,7 @@ def evaluate_model(
         model.eval()
 
         test_dataset = get_dataset_split(
-            DatasetSplit.TEST, TokenizationType.GRPO, tokenizer
+            DatasetSplit.TEST, tokenization_type, tokenizer
         )
         mlflow.log_param("test_dataset_size", len(test_dataset))
 

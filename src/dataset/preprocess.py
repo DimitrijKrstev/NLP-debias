@@ -4,7 +4,7 @@ from typing import Any
 from datasets import Dataset  # type: ignore[import-untyped]
 from pandas import DataFrame, read_csv
 
-from constants import GRPO_SYSTEM_PROMPT
+from constants import SYSTEM_PROMPT
 from dataset.constants import (
     DATASET_PATH,
     DATASET_SLICE_BY_SPLIT_TYPE,
@@ -78,7 +78,7 @@ def tokenize_data(batch: dict, tokenizer: Any) -> dict:
         messages,
         tokenize=True,
         add_generation_prompt=False,
-        max_length=256,
+        max_length=512,  # INCREASED from 256 to fit teacher outputs
         padding="max_length",
         truncation=True,
     )
@@ -87,9 +87,16 @@ def tokenize_data(batch: dict, tokenizer: Any) -> dict:
         [[message[0]] for message in messages],
         tokenize=True,
         add_generation_prompt=True,
-        max_length=256,
+        max_length=512,  # INCREASED from 256
         padding="max_length",
         truncation=True,
+    )
+
+    tokenized_input = tokenizer(
+        biased_texts,
+        padding="max_length",
+        truncation=True,
+        max_length=512,  # INCREASED from 256
     )
 
     labels = []
@@ -104,7 +111,11 @@ def tokenize_data(batch: dict, tokenizer: Any) -> dict:
     return {
         "input_ids": input_ids,
         "labels": labels,
-        "attention_mask": [[1] * len(ids) for ids in input_ids],
+        "attention_mask": [
+            [1 if token != tokenizer.pad_token_id else 0 for token in ids]
+            for ids in input_ids
+        ],
+        "tokenized_input": tokenized_input["input_ids"],
         "biased": batch[WNCColumn.BIASED],
         "neutral": batch[WNCColumn.NEUTRAL],
     }
@@ -113,7 +124,7 @@ def tokenize_data(batch: dict, tokenizer: Any) -> dict:
 def map_grpo_data(sample: dict) -> dict:
     return {
         "prompt": [
-            {"role": "system", "content": GRPO_SYSTEM_PROMPT},
+            {"role": "system", "content": SYSTEM_PROMPT},
             {
                 "role": "user",
                 "content": f"Make this neutral: {sample[WNCColumn.BIASED]}",
@@ -138,7 +149,16 @@ def tokenize_for_grpo(dataset: Dataset, _) -> Dataset:
     )
 
 
+def tokenize_for_distillation(dataset: Dataset, tokenizer: Any) -> Dataset:
+    return dataset.map(
+        lambda data: tokenize_data(data, tokenizer),
+        batched=True,
+        remove_columns=dataset.column_names,
+    ).remove_columns([WNCColumn.BIASED, WNCColumn.NEUTRAL])
+
+
 TOKENIZE_FUNCTION_BY_TYPE = {
     TokenizationType.SFT: tokenize_for_sft,
     TokenizationType.GRPO: tokenize_for_grpo,
+    TokenizationType.DISTIL: tokenize_for_distillation,
 }
