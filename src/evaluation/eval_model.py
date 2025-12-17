@@ -25,7 +25,8 @@ def evaluate_model(
     model_name: str,
     judge_model_name: str,
     tokenization_type: TokenizationType,
-    mlflow_experiment: str = "NLP-Debias-Eval",
+    mlflow_experiment: str,
+    existing_evalution_csv: Path | None,
 ) -> None:
     mlflow.set_experiment(mlflow_experiment)
 
@@ -41,32 +42,51 @@ def evaluate_model(
 
         tokenizer = load_tokenizer(model_name)
 
-        try:
-            base_model = load_model(model_name, True)
-            model = PeftModel.from_pretrained(base_model, model_tokenizer_path)
-            logger.info("Successfully loaded as PEFT model")
-        except Exception as e:
-            logger.error(f"Failed to load as PEFT model: {e}")
-            config = AutoConfig.from_pretrained(
-                model_tokenizer_path, trust_remote_code=True
+        if existing_evalution_csv is not None:
+            predictions_csv_path = Path(existing_evalution_csv)
+            all_predictions = []
+            with open(
+                predictions_csv_path, mode="r", newline="", encoding="utf-8"
+            ) as f:
+                reader = csv.reader(f)
+                next(reader)  # Skip header
+                for row in reader:
+                    all_predictions.append(row[2])
+
+            test_dataset = get_dataset_split(
+                DatasetSplit.TEST, tokenization_type, tokenizer
             )
-            model = AutoModelForCausalLM.from_pretrained(  # type: ignore[assignment]
+
+        else:
+            try:
+                base_model = load_model(model_name, True)
+                model = PeftModel.from_pretrained(base_model, model_tokenizer_path)
+                logger.info("Successfully loaded as PEFT model")
+            except Exception as e:
+                logger.error(f"Failed to load as PEFT model: {e}")
+                config = AutoConfig.from_pretrained(
+                    model_tokenizer_path, trust_remote_code=True
+                )
+                model = AutoModelForCausalLM.from_pretrained(  # type: ignore[assignment]
+                    model_tokenizer_path,
+                    config=config,
+                    load_in_4bit=True,
+                    device_map="auto",
+                )
+
+            model.eval()
+
+            test_dataset = get_dataset_split(
+                DatasetSplit.TEST, tokenization_type, tokenizer
+            )
+            mlflow.log_param("test_dataset_size", len(test_dataset))
+
+            all_predictions, predictions_csv_path = _generate_predictions(
+                model,
+                tokenizer,
+                test_dataset,
                 model_tokenizer_path,
-                config=config,
-                load_in_4bit=True,
-                device_map="auto",
             )
-
-        model.eval()
-
-        test_dataset = get_dataset_split(
-            DatasetSplit.TEST, tokenization_type, tokenizer
-        )
-        mlflow.log_param("test_dataset_size", len(test_dataset))
-
-        all_predictions, predictions_csv_path = _generate_predictions(
-            model, tokenizer, test_dataset, model_tokenizer_path
-        )
 
         results = compute_metrics(
             test_dataset[WNCColumn.BIASED],
@@ -89,7 +109,10 @@ def evaluate_model(
 
 
 def _generate_predictions(
-    model: Any, tokenizer: Any, test_dataset: Dataset, model_tokenizer_path: str
+    model: Any,
+    tokenizer: Any,
+    test_dataset: Dataset,
+    model_tokenizer_path: str,
 ) -> tuple[list[str], Path]:
     loader = DataLoader(test_dataset, batch_size=BATCH_SIZE)  # type: ignore
     all_predictions = []

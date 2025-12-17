@@ -9,7 +9,7 @@ from dataset.download import download_wnc
 from dataset.enums import TokenizationType
 from evaluation.eval_model import evaluate_model
 from judge.main import get_judge_score
-from rl.main import run_rlhf_training
+from rl.main import run_grpo_training
 from sft.train import train_model
 from soft_label_distil.train import train_distillation_model
 from soft_label_distil.utils import (
@@ -47,6 +47,7 @@ def eval_model(
     judge_model_name: str = "google/gemini-2.5-flash",
     tokenization_type: TokenizationType = TokenizationType.SFT,
     mlflow_experiment: str = "NLP-Debias-Eval",
+    existing_evalution_csv: str | None = None,
 ) -> None:
     logger.info(f"Evaluating model: {model_name}")
     evaluate_model(
@@ -55,6 +56,7 @@ def eval_model(
         judge_model_name,
         tokenization_type,
         mlflow_experiment,
+        Path(existing_evalution_csv) if existing_evalution_csv is not None else None,
     )
 
 
@@ -64,7 +66,7 @@ def train_rl_model(
     mflow_experiment: str = "RL-NLP-Debias",
     quantize: bool = True,
 ) -> None:
-    run_rlhf_training(
+    run_grpo_training(
         model_name,
         mflow_experiment,
         quantize,
