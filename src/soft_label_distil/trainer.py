@@ -58,9 +58,6 @@ class DistillationTrainer(Trainer):
         tokenized_inputs = inputs.get("tokenized_input", {})
         labels = inputs.get("labels", [])
 
-        if isinstance(tokenized_inputs, dict) and not tokenized_inputs:
-            logger.warning("[DEBUG] tokenized_inputs is empty dict!")
-
         decoded_batched_biased_texts = self.processing_class.batch_decode(
             tokenized_inputs,
             skip_special_tokens=True,
@@ -96,7 +93,7 @@ class DistillationTrainer(Trainer):
                 kl_values = [kl.item() for kl in filtered_batch_kl_losses]
                 logger.info(
                     f"Batch KL divergences: min={min(kl_values):.4f}, "
-                    f"max={max(kl_values):.4f}, mean={sum(kl_values)/len(kl_values):.4f}, "
+                    f"max={max(kl_values):.4f}, mean={sum(kl_values) / len(kl_values):.4f}, "
                     f"count={len(kl_values)}/{len(decoded_batched_biased_texts)}"
                 )
 
@@ -116,12 +113,6 @@ class DistillationTrainer(Trainer):
         else:
             total_loss = (
                 self.alpha * distillation_loss + (1 - self.alpha) * standard_hard_loss
-            )
-            logger.info(
-                f"[DEBUG] Loss breakdown: distillation={distillation_loss.item() if torch.is_tensor(distillation_loss) else distillation_loss:.4f}, "
-                f"hard={standard_hard_loss.item():.4f}, "
-                f"total={total_loss.item():.4f} "
-                f"(alpha={self.alpha})"
             )
 
             self.log(
@@ -175,6 +166,10 @@ class DistillationTrainer(Trainer):
 
             student_pos = prompt_length + pos
             if student_pos >= len(student_logits):
+                logger.warning(
+                    f"Student sequence too short: student_pos={student_pos} >= len={len(student_logits)}, "
+                    f"only used {pos}/{len(teacher_logprobs)} teacher positions"
+                )
                 break
 
             teacher_probabilities, raw_coverage = build_teacher_distribution(

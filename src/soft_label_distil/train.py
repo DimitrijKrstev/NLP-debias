@@ -54,7 +54,9 @@ def train_distillation_model(
         mlflow.set_tag("task", "training")
         mlflow.set_tag("training_type", "distillation")
 
-        model = load_peft_model(model_name, quantize)
+        # model = load_peft_model(model_name, quantize)
+        base_model = load_model(model_name, True)
+        model = PeftModel.from_pretrained(base_model, "./models/distil_output_4")
         tokenizer = load_tokenizer(model_name)
         model.train()
 

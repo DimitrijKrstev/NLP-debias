@@ -22,7 +22,6 @@ def get_judge_score(
     model: str,
     score_file_name: str | None,
 ) -> float:
-    instructions = JUDGE_INSTRUCTIONS
     prompt = build_judge_prompt(biased_text, model_output, reference_text)
 
     try:
@@ -30,7 +29,7 @@ def get_judge_score(
             model=model,
             response_model=ModelResponseEvaluation,
             messages=[
-                {"role": "system", "content": instructions},
+                {"role": "system", "content": JUDGE_INSTRUCTIONS},
                 {"role": "user", "content": prompt},
             ],
             max_tokens=1024,

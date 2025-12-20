@@ -28,9 +28,9 @@ def get_distillation_training_args() -> TrainingArguments:
         output_dir=DISTIL_OUTPUT_DIR.as_posix(),
         overwrite_output_dir=True,
         num_train_epochs=3,
-        per_device_train_batch_size=4,  # REDUCED from 8 (longer sequences need more memory)
-        per_device_eval_batch_size=8,   # REDUCED from 16
-        gradient_accumulation_steps=4,  # INCREASED from 2 to maintain effective batch size
+        per_device_train_batch_size=4,
+        per_device_eval_batch_size=8,
+        gradient_accumulation_steps=4,
         learning_rate=2e-5,
         warmup_ratio=0.1,
         weight_decay=0.001,

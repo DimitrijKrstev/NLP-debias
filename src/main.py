@@ -7,6 +7,7 @@ from transformers import AutoTokenizer, PreTrainedTokenizer
 from constants import DISTIL_OUTPUT_DIR
 from dataset.download import download_wnc
 from dataset.enums import TokenizationType
+from iterative_dpo.main import run_iterative_dpo_training
 from evaluation.eval_model import evaluate_model
 from judge.main import get_judge_score
 from rl.main import run_grpo_training
@@ -42,11 +43,11 @@ def sft_train_model(
 
 @app.command()
 def eval_model(
-    model_tokenizer_path: str = "grpo-debiasing-model/checkpoint-2200",
+    model_tokenizer_path: str = "Qwen/Qwen3-4B",
     model_name: str = "Qwen/Qwen3-4B",
-    judge_model_name: str = "google/gemini-2.5-flash",
+    judge_model_name: str = "google/gemini-3-flash-preview",
     tokenization_type: TokenizationType = TokenizationType.SFT,
-    mlflow_experiment: str = "NLP-Debias-Eval",
+    mlflow_experiment: str = "NLP-Debias-Eval-BASE",
     existing_evalution_csv: str | None = None,
 ) -> None:
     logger.info(f"Evaluating model: {model_name}")
@@ -135,6 +136,23 @@ def distil_train_model(
         teacher_model_name=teacher_model_name,
         temperature=temperature,
         alpha=alpha,
+    )
+
+
+@app.command()
+def train_iterative_dpo(
+    model_name: str = "Qwen/qwen3-4B",
+    mlflow_experiment: str = "Iterative-DPO",
+    judge_model_name: str = "gpt-5-mini",
+    quantize: bool = True,
+    batch_size: int = 25,
+) -> None:
+    run_iterative_dpo_training(
+        model_name=model_name,
+        mlflow_experiment=mlflow_experiment,
+        judge_model_name=judge_model_name,
+        quantize=quantize,
+        sample_train_batch=batch_size,
     )
 
 

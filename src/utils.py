@@ -1,6 +1,7 @@
 import os
 from logging import getLogger
 from pathlib import Path
+from re import DOTALL, sub
 from typing import Any
 
 import torch
@@ -100,3 +101,8 @@ def load_peft_model(model_name: str, quantize: bool) -> Any:
     model.print_trainable_parameters()
 
     return model
+
+
+def remove_thinking_tags(text: str) -> str:
+    text = sub(r"<think>.*?</think>", "", text, flags=DOTALL)
+    return text.strip()

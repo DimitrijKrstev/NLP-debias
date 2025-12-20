@@ -68,54 +68,42 @@ def tokenize_data(batch: dict, tokenizer: Any) -> dict:
 
     messages = [
         [
-            {"role": "user", "content": f"{TRAINING_PROMPT}:\nBiased text: {b}"},
-            {"role": "assistant", "content": n},
+            {"role": "user", "content": f"{TRAINING_PROMPT}:\nBiased text: {biased}"},
+            {"role": "assistant", "content": neutral},
         ]
-        for b, n in zip(biased_texts, neutral_texts)
+        for biased, neutral in zip(biased_texts, neutral_texts)
     ]
 
-    input_ids = tokenizer.apply_chat_template(
+    full_tokens = tokenizer.apply_chat_template(
         messages,
         tokenize=True,
         add_generation_prompt=False,
-        max_length=512,  # INCREASED from 256 to fit teacher outputs
+        max_length=512,
         padding="max_length",
         truncation=True,
+        enable_thinking=False,
+        return_dict=True,
     )
 
-    user_only = tokenizer.apply_chat_template(
-        [[message[0]] for message in messages],
+    user_tokens = tokenizer.apply_chat_template(
+        [[msg[0]] for msg in messages],
         tokenize=True,
         add_generation_prompt=True,
-        max_length=512,  # INCREASED from 256
-        padding="max_length",
+        max_length=512,
         truncation=True,
-    )
-
-    tokenized_input = tokenizer(
-        biased_texts,
-        padding="max_length",
-        truncation=True,
-        max_length=512,  # INCREASED from 256
+        enable_thinking=False,
     )
 
     labels = []
-    for i in range(len(input_ids)):
-        label = input_ids[i].copy()
-        user_length = sum(
-            1 for token in user_only[i] if token != tokenizer.pad_token_id
-        )
-        label[:user_length] = [-100] * user_length
+    for i in range(len(full_tokens["input_ids"])):
+        user_len = sum(1 for t in user_tokens[i] if t != tokenizer.pad_token_id)
+        label = [-100] * user_len + full_tokens["input_ids"][i][user_len:]
         labels.append(label)
 
     return {
-        "input_ids": input_ids,
+        "input_ids": full_tokens["input_ids"],
         "labels": labels,
-        "attention_mask": [
-            [1 if token != tokenizer.pad_token_id else 0 for token in ids]
-            for ids in input_ids
-        ],
-        "tokenized_input": tokenized_input["input_ids"],
+        "attention_mask": full_tokens["attention_mask"],
         "biased": batch[WNCColumn.BIASED],
         "neutral": batch[WNCColumn.NEUTRAL],
     }
@@ -134,6 +122,27 @@ def map_grpo_data(sample: dict) -> dict:
     }
 
 
+def map_dpo_data(sample: dict, tokenizer: Any) -> dict:
+    prompt_messages = [
+        {"role": "system", "content": SYSTEM_PROMPT},
+        {
+            "role": "user",
+            "content": f"Make this neutral: {sample[WNCColumn.BIASED]}",
+        },
+    ]
+
+    formatted_prompt = tokenizer.apply_chat_template(
+        prompt_messages, tokenize=False, add_generation_prompt=True
+    )
+
+    return {
+        "prompt": prompt_messages,
+        "formatted_prompt": formatted_prompt,
+        WNCColumn.BIASED: sample[WNCColumn.BIASED],
+        WNCColumn.NEUTRAL: sample[WNCColumn.NEUTRAL],
+    }
+
+
 def tokenize_for_sft(dataset: Dataset, tokenizer: Any) -> Dataset:
     return dataset.map(
         lambda data: tokenize_data(data, tokenizer),
@@ -149,6 +158,13 @@ def tokenize_for_grpo(dataset: Dataset, _) -> Dataset:
     )
 
 
+def tokenize_for_dpo(dataset: Dataset, tokenizer: Any) -> Dataset:
+    return dataset.map(
+        lambda data: map_dpo_data(data, tokenizer),
+        batched=False,
+    )
+
+
 def tokenize_for_distillation(dataset: Dataset, tokenizer: Any) -> Dataset:
     return dataset.map(
         lambda data: tokenize_data(data, tokenizer),
@@ -160,5 +176,6 @@ def tokenize_for_distillation(dataset: Dataset, tokenizer: Any) -> Dataset:
 TOKENIZE_FUNCTION_BY_TYPE = {
     TokenizationType.SFT: tokenize_for_sft,
     TokenizationType.GRPO: tokenize_for_grpo,
+    TokenizationType.DPO: tokenize_for_dpo,
     TokenizationType.DISTIL: tokenize_for_distillation,
 }

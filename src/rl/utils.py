@@ -1,4 +1,3 @@
-import re
 from logging import getLogger
 
 from trl.trainer.grpo_config import GRPOConfig
@@ -6,6 +5,7 @@ from trl.trainer.grpo_config import GRPOConfig
 from constants import JUDGE_SCORE_FILE
 from dataset.enums import WNCColumn
 from judge.main import get_judge_score
+from utils import remove_thinking_tags
 
 logger = getLogger(__name__)
 
@@ -69,8 +69,3 @@ def get_grpo_config(model_name: str) -> GRPOConfig:
         remove_unused_columns=False,
         report_to="mlflow",
     )
-
-
-def remove_thinking_tags(text: str) -> str:
-    text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL)
-    return text.strip()

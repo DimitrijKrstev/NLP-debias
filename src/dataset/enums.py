@@ -16,3 +16,4 @@ class TokenizationType(StrEnum):
     SFT = "SFT"
     GRPO = "GRPO"
     DISTIL = "DISTIL"
+    DPO = "DPO"
