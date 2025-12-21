@@ -1,16 +1,26 @@
+from csv import DictWriter
 from logging import getLogger
 from os import getenv
+from pathlib import Path
 from typing import Any, Dict, List
 
 import mlflow
+import torch
 from dotenv import load_dotenv
 from openai import OpenAI
 from torch import no_grad
 from transformers import PreTrainedModel, PreTrainedTokenizerBase
 from trl.trainer.dpo_config import DPOConfig
 
-from iterative_dpo.constants import ITERATIVE_DPO_JUDGE_INSTRUCTIONS
-from iterative_dpo.models import ModelPreference, SentenceWithRank
+from iterative_dpo.constants import (
+    ITERATIVE_DPO_JUDGE_INSTRUCTIONS,
+    RANKED_RESPONSES_CSV,
+)
+from iterative_dpo.models import (
+    ModelOutputSentenceWithRank,
+    ModelPreference,
+    SentenceWithRank,
+)
 from utils import remove_thinking_tags
 
 load_dotenv()
@@ -22,6 +32,10 @@ logger = getLogger(__name__)
 
 
 def get_dpo_config(model_name: str) -> DPOConfig:
+    bf16_supported = (
+        torch.cuda.is_available() and torch.cuda.get_device_capability()[0] >= 8
+    )
+
     return DPOConfig(
         output_dir=model_name,
         per_device_train_batch_size=2,
@@ -32,7 +46,8 @@ def get_dpo_config(model_name: str) -> DPOConfig:
         max_length=512,
         logging_steps=10,
         save_strategy="no",
-        bf16=True,
+        bf16=bf16_supported,
+        fp16=not bf16_supported and torch.cuda.is_available(),
         remove_unused_columns=False,
         report_to="mlflow",
     )
@@ -123,8 +138,7 @@ def _rank_responses_with_judge(
     sample_idx: int = 0,
 ) -> list[str]:
     sentences_with_ranks = [
-        SentenceWithRank(id=i, rank=i, text=response)
-        for i, response in enumerate(responses)
+        SentenceWithRank(i, i, response) for i, response in enumerate(responses)
     ]
     model_preference = _get_judge_rankings(
         biased_text,
@@ -136,20 +150,38 @@ def _rank_responses_with_judge(
         ground_truth = next(
             sentence
             for sentence in model_preference.sentences
-            if sentence == sentences_with_ranks[0]
+            if sentence.id == sentences_with_ranks[0].id
         )
         logger.info(
             f"Rank for ground truth: {ground_truth.rank} "
-            f"highest rank id: {max(model_preference.sentences, key=lambda x: x.rank).id}"
+            f"best rank id: {min(model_preference.sentences, key=lambda x: x.rank).id}"
+            f"worst rank id: {max(model_preference.sentences, key=lambda x: x.rank).id}"
         )
     except StopIteration:
         logger.error(
             f"Ground truth response not found in judge rankings. for rankings: {sentences_with_ranks}"
         )
 
+    id_to_rank = {sentence.id: sentence.rank for sentence in model_preference.sentences}
+
+    response_with_sentence_text = [
+        SentenceWithRank(
+            original.id, id_to_rank.get(original.id, original.rank), original.text
+        )
+        for original in sentences_with_ranks
+    ]
+
+    _append_rankings_to_csv(
+        response_with_sentence_text,
+        sentences_with_ranks,
+        biased_text,
+        iteration,
+        sample_idx,
+    )
+
     ranked_responses = [
         response.text
-        for response in sorted(model_preference.sentences, key=lambda x: x.rank)
+        for response in sorted(response_with_sentence_text, key=lambda x: x.rank)
     ]
     logger.info(
         f"Ground truth is chosen as best: {ranked_responses[0] == responses[0]}"
@@ -162,7 +194,7 @@ def _rank_responses_with_judge(
             for s in sentences_with_ranks
         ],
         "judge_sorted_list": [
-            {"id": s.id, "text": s.text, "judge_rank": s.rank}
+            {"id": s.id, "judge_rank": s.rank}
             for s in sorted(
                 model_preference.sentences, key=lambda x: x.rank, reverse=True
             )
@@ -177,7 +209,9 @@ def _rank_responses_with_judge(
 
 
 def _get_judge_rankings(
-    biased_text: str, responses: list[SentenceWithRank], judge_model_name: str
+    biased_text: str,
+    responses: list[SentenceWithRank],
+    judge_model_name: str,
 ) -> ModelPreference:
     try:
         ranks = CLIENT.chat.completions.parse(
@@ -198,14 +232,63 @@ def _get_judge_rankings(
         logger.error(
             f"Error getting response from {judge_model_name}: {e}, fallbacking to status quo ranking."
         )
-        return ModelPreference(sentences=responses, overall_reasoning=None)
+        fallback_sentences = [
+            ModelOutputSentenceWithRank(id=s.id, rank=s.rank) for s in responses
+        ]
+        return ModelPreference(sentences=fallback_sentences, overall_reasoning=None)
 
     return ranks.choices[0].message.parsed
 
 
 def _get_judge_user_prompt(biased_text: str, responses: list[SentenceWithRank]) -> str:
     return f"""
-    Given the biased sentence: "{biased_text}", rank the following responses from best (1) to worst (N)
-    Responses:
-    {responses}
-"""
+    The following is a biased text sample from a research dataset used to train bias detection models:
+
+    Original biased text: "{biased_text}"
+
+    Task: Rank the following debiased responses from best (0) to worst (N) based on how well they remove bias while preserving meaning.
+
+    Responses to evaluate:
+    {responses}"""
+
+
+def _append_rankings_to_csv(
+    response_with_sentence_text: list[SentenceWithRank],
+    original_ranks: list[SentenceWithRank],
+    biased_text: str,
+    iteration: int,
+    sample_idx: int,
+) -> None:
+    csv_path = Path(RANKED_RESPONSES_CSV)
+    csv_path.parent.mkdir(parents=True, exist_ok=True)
+
+    file_exists = csv_path.exists()
+    fieldnames = [
+        "iteration",
+        "sample_idx",
+        "biased_text",
+        "response_id",
+        "original_rank",
+        "judge_rank",
+        "response_text",
+    ]
+
+    id_to_original_rank = {s.id: s.rank for s in original_ranks}
+
+    with open(csv_path, "a", newline="", encoding="utf-8") as csvfile:
+        writer = DictWriter(csvfile, fieldnames=fieldnames)
+        if not file_exists:
+            writer.writeheader()
+
+        for response in response_with_sentence_text:
+            writer.writerow(
+                {
+                    "iteration": iteration,
+                    "sample_idx": sample_idx,
+                    "biased_text": biased_text,
+                    "response_id": response.id,
+                    "original_rank": id_to_original_rank.get(response.id, -1),
+                    "judge_rank": response.rank,
+                    "response_text": response.text,
+                }
+            )

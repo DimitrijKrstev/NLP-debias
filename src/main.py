@@ -4,11 +4,13 @@ from pathlib import Path
 import typer
 from transformers import AutoTokenizer, PreTrainedTokenizer
 
+basicConfig(level=INFO, format="%(levelname)s - %(filename)s:%(lineno)d - %(message)s")
+
 from constants import DISTIL_OUTPUT_DIR
 from dataset.download import download_wnc
 from dataset.enums import TokenizationType
-from iterative_dpo.main import run_iterative_dpo_training
 from evaluation.eval_model import evaluate_model
+from iterative_dpo.main import run_iterative_dpo_training
 from judge.main import get_judge_score
 from rl.main import run_grpo_training
 from sft.train import train_model
@@ -20,7 +22,6 @@ from soft_label_distil.utils import (
 
 app = typer.Typer(pretty_exceptions_enable=False)
 
-basicConfig(level=INFO, format="%(levelname)s - %(filename)s:%(lineno)d - %(message)s")
 logger = getLogger(__name__)
 
 
@@ -142,6 +143,7 @@ def distil_train_model(
 @app.command()
 def train_iterative_dpo(
     model_name: str = "Qwen/qwen3-4B",
+    model_tokenizer_path: str | None = None,
     mlflow_experiment: str = "Iterative-DPO",
     judge_model_name: str = "gpt-5-mini",
     quantize: bool = True,
@@ -149,6 +151,7 @@ def train_iterative_dpo(
 ) -> None:
     run_iterative_dpo_training(
         model_name=model_name,
+        model_tokenizer_path=model_tokenizer_path,
         mlflow_experiment=mlflow_experiment,
         judge_model_name=judge_model_name,
         quantize=quantize,

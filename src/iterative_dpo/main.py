@@ -13,13 +13,14 @@ from iterative_dpo.utils import (
     generate_responses_with_temperatures,
     get_dpo_config,
 )
-from utils import load_peft_model, load_tokenizer
+from utils import load_unsloth_model
 
 logger = getLogger(__name__)
 
 
 def run_iterative_dpo_training(
     model_name: str,
+    model_tokenizer_path: str | None,
     mlflow_experiment: str,
     judge_model_name: str,
     quantize: bool,
@@ -27,8 +28,13 @@ def run_iterative_dpo_training(
 ) -> None:
     mlflow.set_experiment(mlflow_experiment)
 
-    tokenizer = load_tokenizer(model_name)
-    model = load_peft_model(model_name, quantize)
+    logger.info(f"Loading base model: {model_name}")
+    model, tokenizer = load_unsloth_model(model_name, quantize)
+
+    if model_tokenizer_path:
+        logger.info(f"Loading adapters from checkpoint: {model_tokenizer_path}")
+        model.load_adapter(model_tokenizer_path, adapter_name="checkpoint")
+        model.set_adapter("checkpoint")
 
     dataset = get_dataset_split(DatasetSplit.TRAIN, TokenizationType.DPO, tokenizer)
 
@@ -91,6 +97,8 @@ def run_iterative_dpo_training(
 
             checkpoint_dir = ITERATIVE_DPO_OUTPUT_DIR / f"checkpoint-iter-{iteration}"
             model.save_pretrained(checkpoint_dir)
+            tokenizer.save_pretrained(checkpoint_dir)
+
             logger.info(f"Model checkpoint saved to {checkpoint_dir}")
 
             previous += sample_train_batch

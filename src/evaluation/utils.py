@@ -99,6 +99,7 @@ def debias_text(texts: list[str], model, tokenizer, max_length: int = 256) -> li
         chat_prompts,
         tokenize=False,
         add_generation_prompt=True,
+        enable_thinking=False,
     )
 
     inputs = tokenizer(

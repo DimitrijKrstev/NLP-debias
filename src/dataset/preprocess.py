@@ -132,7 +132,7 @@ def map_dpo_data(sample: dict, tokenizer: Any) -> dict:
     ]
 
     formatted_prompt = tokenizer.apply_chat_template(
-        prompt_messages, tokenize=False, add_generation_prompt=True
+        prompt_messages, tokenize=False, add_generation_prompt=True, enable_thinking=False
     )
 
     return {

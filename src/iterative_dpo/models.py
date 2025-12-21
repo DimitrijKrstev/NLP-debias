@@ -1,13 +1,15 @@
+from attr import dataclass
 from pydantic import BaseModel
 
 
-class SentenceWithRank(BaseModel):
+@dataclass(frozen=True, slots=True)
+class SentenceWithRank:
     id: int
     rank: int
     text: str
 
     def __str__(self) -> str:
-        return f"id: {self.id} rank: {self.rank} text: {self.text}\n"
+        return f"- ID: {self.id} rank: {self.rank} text: {self.text}\n"
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, SentenceWithRank):
@@ -18,6 +20,11 @@ class SentenceWithRank(BaseModel):
         return hash((self.id, self.text))
 
 
+class ModelOutputSentenceWithRank(BaseModel):
+    id: int
+    rank: int
+
+
 class ModelPreference(BaseModel):
-    sentences: list[SentenceWithRank]
+    sentences: list[ModelOutputSentenceWithRank]
     overall_reasoning: str | None
