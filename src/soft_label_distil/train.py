@@ -12,9 +12,10 @@ from soft_label_distil.utils import (
     get_distillation_training_args,
     load_teacher_responses,
 )
-from utils import load_peft_model, load_tokenizer
+from utils import load_unsloth_model
 
 environ["TOKENIZERS_PARALLELISM"] = "false"
+environ["UNSLOTH_RETURN_LOGITS"] = "1"
 
 logger = logging.getLogger(__name__)
 
@@ -54,10 +55,7 @@ def train_distillation_model(
         mlflow.set_tag("task", "training")
         mlflow.set_tag("training_type", "distillation")
 
-        # model = load_peft_model(model_name, quantize)
-        base_model = load_model(model_name, True)
-        model = PeftModel.from_pretrained(base_model, "./models/distil_output_4")
-        tokenizer = load_tokenizer(model_name)
+        model, tokenizer = load_unsloth_model(model_name, quantize)
         model.train()
 
         train_dataset = get_dataset_split(
@@ -90,6 +88,7 @@ def train_distillation_model(
             f"Starting distillation training with teacher={teacher_model_name}, "
             f"temperature={temperature}, alpha={alpha}..."
         )
+
         trainer.train()
 
         logger.info(f"Saving model and tokenizer to {DISTIL_OUTPUT_DIR}")

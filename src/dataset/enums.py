@@ -14,6 +14,7 @@ class DatasetSplit(StrEnum):
 
 class TokenizationType(StrEnum):
     SFT = "SFT"
+    EVAL = "EVAL"
     GRPO = "GRPO"
     DISTIL = "DISTIL"
     DPO = "DPO"

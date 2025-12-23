@@ -1,4 +1,5 @@
 from logging import getLogger
+from os import environ
 from typing import Any, List
 
 import torch
@@ -10,6 +11,8 @@ from soft_label_distil.utils import (
     build_teacher_distribution,
     get_teacher_logprobs,
 )
+
+environ["UNSLOTH_RETURN_LOGITS"] = "1"
 
 logger = getLogger(__name__)
 
@@ -47,12 +50,15 @@ class DistillationTrainer(Trainer):
     def compute_loss(
         self, model, inputs, return_outputs=False, num_items_in_batch=None
     ):
+        environ["UNSLOTH_RETURN_LOGITS"] = "1"
         outputs = model(
             **{
                 input: value
                 for input, value in inputs.items()
                 if input in ["input_ids", "attention_mask", "labels"]
-            }
+            },
+            return_dict=True,
+            output_hidden_states=False,
         )
         student_logits = outputs.logits
         tokenized_inputs = inputs.get("tokenized_input", {})
@@ -99,15 +105,15 @@ class DistillationTrainer(Trainer):
 
                 distillation_loss = torch.stack(filtered_batch_kl_losses).mean()
             else:
-                logger.warning("[DEBUG] No KL losses were computed for this batch!")
+                logger.error("No KL losses were computed for this batch!")
 
         except Exception as e:
             logger.warning(f"Error computing distillation loss: {e}")
 
         if isinstance(distillation_loss, float) and distillation_loss == 0.0:
-            logger.warning(
-                "[DEBUG] Distillation loss is 0.0 for this batch - no teacher logprobs were successfully computed. "
-                "Using only standard hard loss."
+            logger.error(
+                "Distillation loss is 0.0 for this full batch "
+                "using only standard hard loss."
             )
             total_loss = standard_hard_loss
         else:
@@ -146,43 +152,63 @@ class DistillationTrainer(Trainer):
             logger.warning("Found missing teacher logprobs")
             return None
 
-        prompt_length = 0
-        for label in labels:
-            if label == -100:
-                prompt_length += 1
-            else:
-                break
+        response_start_idx = (labels != -100).nonzero(as_tuple=True)[0]
+        if len(response_start_idx) == 0:
+            logger.warning("No non-masked labels found")
+            return None
 
+        response_start = int(response_start_idx[0].item())
         position_losses = []
         vocab_size = student_logits.shape[-1]
         low_coverage_count = 0
 
+        logger.debug(
+            f"Vocab size: {vocab_size}, Student logits shape: {student_logits.shape}"
+        )
+
         for pos, teacher_token_logprob in enumerate(teacher_logprobs):
-            if not teacher_token_logprob.top_logprobs:
-                logger.warning(
-                    f"No top logprobs for token {teacher_token_logprob.token}"
+            try:
+                if not teacher_token_logprob.top_logprobs:
+                    logger.warning(
+                        f"No top logprobs for token {teacher_token_logprob.token}"
+                    )
+                    continue
+
+                # Adjust student position by the response start offset
+                # logits[i] predict token[i+1], so logits[response_start-1] predicts labels[response_start]
+                # This aligns with teacher_logprobs[0] (first response token)
+                student_pos = response_start - 1 + pos
+
+                if student_pos >= len(student_logits):
+                    logger.warning(
+                        f"Student sequence too short: student_pos={student_pos} >= len={len(student_logits)}, "
+                        f"only used {pos}/{len(teacher_logprobs)} teacher positions"
+                    )
+                    break
+
+                if student_pos < 0:
+                    logger.warning(
+                        f"Negative student_pos={student_pos}, skipping position {pos}"
+                    )
+                    continue
+
+                teacher_probabilities, raw_coverage = build_teacher_distribution(
+                    teacher_token_logprob,
+                    vocab_size,
+                    self.processing_class,
+                    self.temperature,
+                    student_logits.device,
+                )
+
+                student_log_probs = log_softmax(
+                    student_logits[student_pos] / self.temperature, dim=-1
+                )
+            except Exception as e:
+                logger.error(
+                    f"Error at position {pos}, student_pos={student_pos if 'student_pos' in locals() else 'N/A'}: {e}",
+                    exc_info=True,
                 )
                 continue
-
-            student_pos = prompt_length + pos
-            if student_pos >= len(student_logits):
-                logger.warning(
-                    f"Student sequence too short: student_pos={student_pos} >= len={len(student_logits)}, "
-                    f"only used {pos}/{len(teacher_logprobs)} teacher positions"
-                )
-                break
-
-            teacher_probabilities, raw_coverage = build_teacher_distribution(
-                teacher_token_logprob,
-                vocab_size,
-                self.processing_class,
-                self.temperature,
-                student_logits.device,
-            )
-
-            student_log_probs = log_softmax(
-                student_logits[student_pos] / self.temperature, dim=-1
-            )
 
             should_normalize_teacher_probs = raw_coverage >= coverage_threshold
             if should_normalize_teacher_probs:

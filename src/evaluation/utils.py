@@ -92,7 +92,7 @@ def _compute_judge_score(
     return average(judge_scores).item()
 
 
-def debias_text(texts: list[str], model, tokenizer, max_length: int = 256) -> list[str]:
+def debias_text(texts: list[str], model, tokenizer, max_length: int = 512) -> list[str]:
     chat_prompts = [_make_chat_prompt(text) for text in texts]
 
     formatted_prompts = tokenizer.apply_chat_template(
@@ -114,9 +114,6 @@ def debias_text(texts: list[str], model, tokenizer, max_length: int = 256) -> li
         outputs = model.generate(
             **inputs,
             max_new_tokens=1024,
-            do_sample=True,
-            temperature=0.7,
-            top_p=0.9,
             pad_token_id=tokenizer.eos_token_id,
             eos_token_id=tokenizer.eos_token_id,
         )

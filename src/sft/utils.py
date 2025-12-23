@@ -1,9 +1,14 @@
+import torch
 from transformers import TrainingArguments
 
 from constants import TRAIN_OUTPUT_DIR
 
 
 def get_training_args() -> TrainingArguments:
+    bf16_supported = (
+        torch.cuda.is_available() and torch.cuda.get_device_capability()[0] >= 8
+    )
+
     return TrainingArguments(
         output_dir=TRAIN_OUTPUT_DIR,
         overwrite_output_dir=True,
@@ -27,5 +32,6 @@ def get_training_args() -> TrainingArguments:
         report_to=["mlflow"],
         run_name="qwen3-debiasing",
         dataloader_num_workers=2,
-        bf16=True,
+        bf16=bf16_supported,
+        fp16=not bf16_supported and torch.cuda.is_available(),
     )

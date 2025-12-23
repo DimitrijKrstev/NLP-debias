@@ -127,7 +127,8 @@ def build_teacher_distribution(
     chosen_token_id = None
 
     if chosen_token_ids:
-        chosen_token_id = chosen_token_ids[0]
+        chosen_token_id = int(chosen_token_ids[0])
+
         chosen_prob = torch.exp(
             torch.tensor(
                 teacher_token_logprob.logprob / temperature,
@@ -143,7 +144,7 @@ def build_teacher_distribution(
         if not token_ids:
             continue
 
-        token_id = token_ids[0]
+        token_id = int(token_ids[0])
 
         is_chosen_token_id = chosen_token_id is not None and token_id == chosen_token_id
         if is_chosen_token_id:

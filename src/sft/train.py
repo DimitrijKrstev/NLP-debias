@@ -8,7 +8,7 @@ from constants import TRAIN_OUTPUT_DIR
 from dataset.enums import DatasetSplit, TokenizationType
 from dataset.preprocess import get_dataset_split
 from sft.utils import get_training_args
-from utils import load_peft_model, load_tokenizer
+from utils import load_peft_model, load_tokenizer, load_unsloth_model
 
 environ["TOKENIZERS_PARALLELISM"] = "false"
 
@@ -38,8 +38,10 @@ def train_model(quantize: bool, mlflow_experiment: str, model_name: str) -> None
         mlflow.set_tag("task", "training")
         mlflow.set_tag("training_type", "sft")
 
-        model = load_peft_model(model_name, quantize)
-        tokenizer = load_tokenizer(model_name)
+        # model = load_peft_model(model_name, quantize)
+        # tokenizer = load_tokenizer(model_name)
+
+        model, tokenizer = load_unsloth_model(model_name, quantize)
         model.train()
 
         train_dataset = get_dataset_split(

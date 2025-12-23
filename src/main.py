@@ -36,7 +36,7 @@ def download_dataset() -> None:
 def sft_train_model(
     quantize: bool = True,
     mlflow_experiment: str = "NLP-Debias",
-    model_name: str = "Qwen/Qwen3-4B",
+    model_name: str = "Qwen/Qwen3-1.7B",
 ) -> None:
     logger.info(f"Training model: {model_name} (quantize={quantize})")
     train_model(quantize, mlflow_experiment, model_name)
@@ -44,10 +44,10 @@ def sft_train_model(
 
 @app.command()
 def eval_model(
-    model_tokenizer_path: str = "Qwen/Qwen3-4B",
-    model_name: str = "Qwen/Qwen3-4B",
+    model_tokenizer_path: str = "Qwen/Qwen3-1.7B",
+    model_name: str = "Qwen/Qwen3-1.7B",
     judge_model_name: str = "google/gemini-3-flash-preview",
-    tokenization_type: TokenizationType = TokenizationType.SFT,
+    tokenization_type: TokenizationType = TokenizationType.EVAL,
     mlflow_experiment: str = "NLP-Debias-Eval-BASE",
     existing_evalution_csv: str | None = None,
 ) -> None:
@@ -64,7 +64,7 @@ def eval_model(
 
 @app.command()
 def train_rl_model(
-    model_name: str = "Qwen/Qwen3-4B",
+    model_name: str = "Qwen/Qwen3-1.7B",
     mflow_experiment: str = "RL-NLP-Debias",
     quantize: bool = True,
 ) -> None:
@@ -119,9 +119,9 @@ def test_load_logprobs(
 def distil_train_model(
     quantize: bool = True,
     mlflow_experiment: str = "NLP-Debias-Distillation",
-    model_name: str = "Qwen/Qwen3-4B",
+    model_name: str = "Qwen/Qwen3-1.7B",
     teacher_responses_file: str = f"{DISTIL_OUTPUT_DIR}/teacher_responses.jsonl",
-    teacher_model_name: str = "Qwen/Qwen3-235B-A22B-Instruct-2507-tput",
+    teacher_model_name: str = "Qwen/Qwen3-235B-A22B-Instruct-2507",
     temperature: float = 1.5,
     alpha: float = 0.5,
 ) -> None:
@@ -142,7 +142,7 @@ def distil_train_model(
 
 @app.command()
 def train_iterative_dpo(
-    model_name: str = "Qwen/qwen3-4B",
+    model_name: str = "Qwen/Qwen3-1.7B",
     model_tokenizer_path: str | None = None,
     mlflow_experiment: str = "Iterative-DPO",
     judge_model_name: str = "gpt-5-mini",
@@ -161,7 +161,8 @@ def train_iterative_dpo(
 
 @app.command()
 def test_tokenizer_match(
-    model_1: str = "Qwen/Qwen3-4B", model_2: str = "deepinfra/fp8/qwen3-235b-a22b-2507"
+    model_1: str = "Qwen/Qwen3-1.7B",
+    model_2: str = "Qwen/Qwen3-235B-A22B-Instruct-2507",
 ) -> None:
     tokenizer_1: PreTrainedTokenizer = AutoTokenizer.from_pretrained(model_1)
     tokenizer_2 = AutoTokenizer.from_pretrained(model_2)

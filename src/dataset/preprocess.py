@@ -66,47 +66,76 @@ def tokenize_data(batch: dict, tokenizer: Any) -> dict:
     biased_texts = batch[WNCColumn.BIASED]
     neutral_texts = batch[WNCColumn.NEUTRAL]
 
-    messages = [
-        [
-            {"role": "user", "content": f"{TRAINING_PROMPT}:\nBiased text: {biased}"},
-            {"role": "assistant", "content": neutral},
+    original_padding_side = tokenizer.padding_side
+    tokenizer.padding_side = "right"
+
+    try:
+        messages = [
+            [
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {
+                    "role": "user",
+                    "content": f"{TRAINING_PROMPT}:\nBiased text: {biased}",
+                },
+                {"role": "assistant", "content": neutral},
+            ]
+            for biased, neutral in zip(biased_texts, neutral_texts)
         ]
-        for biased, neutral in zip(biased_texts, neutral_texts)
-    ]
 
-    full_tokens = tokenizer.apply_chat_template(
-        messages,
-        tokenize=True,
-        add_generation_prompt=False,
-        max_length=512,
-        padding="max_length",
-        truncation=True,
-        enable_thinking=False,
-        return_dict=True,
-    )
+        full_tokens = tokenizer.apply_chat_template(
+            messages,
+            tokenize=True,
+            add_generation_prompt=False,
+            max_length=512,
+            padding="max_length",
+            truncation=True,
+            enable_thinking=False,
+            return_dict=True,
+        )
 
-    user_tokens = tokenizer.apply_chat_template(
-        [[msg[0]] for msg in messages],
-        tokenize=True,
-        add_generation_prompt=True,
-        max_length=512,
-        truncation=True,
-        enable_thinking=False,
-    )
+        prompt_only_tokens = tokenizer.apply_chat_template(
+            [msg[:2] for msg in messages],
+            tokenize=True,
+            add_generation_prompt=True,
+            max_length=512,
+            truncation=True,
+            enable_thinking=False,
+        )
 
-    labels = []
-    for i in range(len(full_tokens["input_ids"])):
-        user_len = sum(1 for t in user_tokens[i] if t != tokenizer.pad_token_id)
-        label = [-100] * user_len + full_tokens["input_ids"][i][user_len:]
-        labels.append(label)
+        tokenized_input = tokenizer(
+            biased_texts,
+            padding="max_length",
+            truncation=True,
+            max_length=512,
+        )
 
-    return {
-        "input_ids": full_tokens["input_ids"],
-        "labels": labels,
-        "attention_mask": full_tokens["attention_mask"],
-        "biased": batch[WNCColumn.BIASED],
-        "neutral": batch[WNCColumn.NEUTRAL],
-    }
+        labels = []
+
+        for i, full_ids in enumerate(full_tokens["input_ids"]):
+            prompt_length = len(
+                [t for t in prompt_only_tokens[i] if t != tokenizer.pad_token_id]
+            )
+            response_start = prompt_length
+
+            newline_ids = [271, 198]
+            while (
+                response_start < len(full_ids)
+                and full_ids[response_start] in newline_ids
+            ):
+                response_start += 1
+
+            labels.append([-100] * response_start + list(full_ids[response_start:]))
+
+        return {
+            "input_ids": full_tokens["input_ids"],
+            "labels": labels,
+            "attention_mask": full_tokens["attention_mask"],
+            "tokenized_input": tokenized_input["input_ids"],
+            "biased": batch[WNCColumn.BIASED],
+            "neutral": batch[WNCColumn.NEUTRAL],
+        }
+    finally:
+        tokenizer.padding_side = original_padding_side
 
 
 def map_grpo_data(sample: dict) -> dict:
@@ -115,7 +144,7 @@ def map_grpo_data(sample: dict) -> dict:
             {"role": "system", "content": SYSTEM_PROMPT},
             {
                 "role": "user",
-                "content": f"Make this neutral: {sample[WNCColumn.BIASED]}",
+                "content": f"{TRAINING_PROMPT}:\nBiased text: {sample[WNCColumn.BIASED]}",
             },
             {"role": "assistant", "content": " "},
         ],
@@ -127,12 +156,15 @@ def map_dpo_data(sample: dict, tokenizer: Any) -> dict:
         {"role": "system", "content": SYSTEM_PROMPT},
         {
             "role": "user",
-            "content": f"Make this neutral: {sample[WNCColumn.BIASED]}",
+            "content": f"{TRAINING_PROMPT}:\nBiased text: {sample[WNCColumn.BIASED]}",
         },
     ]
 
     formatted_prompt = tokenizer.apply_chat_template(
-        prompt_messages, tokenize=False, add_generation_prompt=True, enable_thinking=False
+        prompt_messages,
+        tokenize=False,
+        add_generation_prompt=True,
+        enable_thinking=False,
     )
 
     return {
@@ -144,6 +176,14 @@ def map_dpo_data(sample: dict, tokenizer: Any) -> dict:
 
 
 def tokenize_for_sft(dataset: Dataset, tokenizer: Any) -> Dataset:
+    return dataset.map(
+        lambda data: tokenize_data(data, tokenizer),
+        batched=True,
+        remove_columns=dataset.column_names,
+    ).remove_columns([WNCColumn.BIASED, WNCColumn.NEUTRAL, "tokenized_input"])
+
+
+def tokenize_for_evaluation(dataset: Dataset, tokenizer: Any) -> Dataset:
     return dataset.map(
         lambda data: tokenize_data(data, tokenizer),
         batched=True,
@@ -169,12 +209,12 @@ def tokenize_for_distillation(dataset: Dataset, tokenizer: Any) -> Dataset:
     return dataset.map(
         lambda data: tokenize_data(data, tokenizer),
         batched=True,
-        remove_columns=dataset.column_names,
-    ).remove_columns([WNCColumn.BIASED, WNCColumn.NEUTRAL])
+    ).remove_columns([WNCColumn.NEUTRAL])
 
 
 TOKENIZE_FUNCTION_BY_TYPE = {
     TokenizationType.SFT: tokenize_for_sft,
+    TokenizationType.EVAL: tokenize_for_evaluation,
     TokenizationType.GRPO: tokenize_for_grpo,
     TokenizationType.DPO: tokenize_for_dpo,
     TokenizationType.DISTIL: tokenize_for_distillation,
