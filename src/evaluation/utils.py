@@ -121,11 +121,7 @@ def debias_text(texts: list[str], model, tokenizer, max_length: int = 512) -> li
     input_lengths = inputs["input_ids"].shape[1]
     generated_tokens = outputs[:, input_lengths:]
 
-    decoded_outputs = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
-
-    predicted_texts = [_clean_output(text) for text in decoded_outputs]
-
-    return predicted_texts
+    return tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
 
 
 def _make_chat_prompt(biased_text: str) -> list[dict]:

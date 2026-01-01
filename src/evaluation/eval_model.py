@@ -9,7 +9,6 @@ from peft import PeftModel
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 from transformers import AutoConfig, AutoModelForCausalLM
-from unsloth import FastLanguageModel
 
 from dataset.enums import DatasetSplit, TokenizationType, WNCColumn
 from dataset.preprocess import get_dataset_split
@@ -98,31 +97,20 @@ def _load_model_and_generate_predictions(
     tokenizer: Any,
 ) -> tuple[list[str], Path, Dataset]:
     try:
-        model, _ = FastLanguageModel.from_pretrained(
-            model_name=model_tokenizer_path,
-            max_seq_length=2048,
-            dtype=None,
-            load_in_4bit=True,
-        )
-        FastLanguageModel.for_inference(model)
-        logger.info("Successfully loaded as unsloth model")
+        base_model = load_model(model_name, True)
+        model = PeftModel.from_pretrained(base_model, model_tokenizer_path)
+        logger.info("Successfully loaded as local PEFT model")
     except Exception as e:
-        logger.info(f"Failed to load as unsloth model: {e}")
-        try:
-            base_model = load_model(model_name, True)
-            model = PeftModel.from_pretrained(base_model, model_tokenizer_path)
-            logger.info("Successfully loaded as local PEFT model")
-        except Exception as e:
-            logger.info(f"Failed to load as existing local PEFT model: {e}")
-            config = AutoConfig.from_pretrained(
-                model_tokenizer_path, trust_remote_code=True
-            )
-            model = AutoModelForCausalLM.from_pretrained(  # type: ignore[assignment]
-                model_tokenizer_path,
-                config=config,
-                load_in_4bit=True,
-                device_map="auto",
-            )
+        logger.info(f"Failed to load as existing local PEFT model: {e}")
+        config = AutoConfig.from_pretrained(
+            model_tokenizer_path, trust_remote_code=True
+        )
+        model = AutoModelForCausalLM.from_pretrained(  # type: ignore[assignment]
+            model_tokenizer_path,
+            config=config,
+            load_in_4bit=True,
+            device_map="auto",
+        )
 
     model.eval()
 
