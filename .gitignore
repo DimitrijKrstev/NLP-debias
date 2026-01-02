@@ -17,3 +17,6 @@ dataset/1/
 mlruns/
 models/
 rl_output/
+evaluation/*.csv
+judge_output/
+mlflow.db

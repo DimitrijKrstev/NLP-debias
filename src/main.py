@@ -35,7 +35,7 @@ def download_dataset() -> None:
 @app.command()
 def sft_train_model(
     quantize: bool = True,
-    mlflow_experiment: str = "NLP-Debias",
+    mlflow_experiment: str = "SFT-NLP-Debias",
     model_name: str = "Qwen/Qwen3-1.7B",
 ) -> None:
     logger.info(f"Training model: {model_name} (quantize={quantize})")
@@ -48,7 +48,7 @@ def eval_model(
     model_name: str = "Qwen/Qwen3-1.7B",
     judge_model_name: str = "google/gemini-3-flash-preview",
     tokenization_type: TokenizationType = TokenizationType.EVAL,
-    mlflow_experiment: str = "NLP-Debias-Eval-BASE",
+    mlflow_experiment: str = "NLP-Debias-Eval",
     existing_evalution_csv: str | None = None,
 ) -> None:
     logger.info(f"Evaluating model: {model_name}")

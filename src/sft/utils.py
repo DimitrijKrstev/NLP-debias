@@ -19,7 +19,8 @@ def get_training_args() -> TrainingArguments:
         learning_rate=1e-4,
         warmup_ratio=0.03,
         weight_decay=0.01,
-        logging_steps=50,
+        logging_steps=25,
+        logging_first_step=True,
         eval_strategy="steps",
         eval_steps=100,
         save_steps=200,
@@ -34,4 +35,6 @@ def get_training_args() -> TrainingArguments:
         dataloader_num_workers=2,
         bf16=bf16_supported,
         fp16=not bf16_supported and torch.cuda.is_available(),
+        logging_nan_inf_filter=True,
+        include_inputs_for_metrics=False,
     )
