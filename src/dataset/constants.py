@@ -24,4 +24,5 @@ DATASET_SLICE_BY_SPLIT_TYPE = {
     DatasetSplit.TRAIN: slice(0, 3000),
     DatasetSplit.VALIDATION: slice(3000, 3300),
     DatasetSplit.TEST: slice(-300, None),
+    DatasetSplit.FULL: slice(0, None),
 }

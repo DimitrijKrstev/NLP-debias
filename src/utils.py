@@ -14,6 +14,7 @@ from peft import (
 from transformers import (
     AutoConfig,
     AutoModelForCausalLM,
+    AutoModelForSequenceClassification,
     AutoTokenizer,
     BitsAndBytesConfig,
 )
@@ -84,6 +85,70 @@ def load_peft_model(model_name: str, quantize: bool) -> Any:
     logger.info("Applying LoRA configuration")
     lora_config = LoraConfig(
         task_type=TaskType.CAUSAL_LM,
+        inference_mode=False,
+        r=16,
+        lora_alpha=32,
+        lora_dropout=0.1,
+        target_modules=[
+            "q_proj",
+            "v_proj",
+            "k_proj",
+            "o_proj",
+            "gate_proj",
+            "up_proj",
+            "down_proj",
+        ],
+    )
+    model = get_peft_model(model, lora_config)
+    model.print_trainable_parameters()
+
+    return model
+
+
+def load_peft_classifcation_model(model_name: str, quantize: bool) -> Any:
+    logger.info(f"Loading model for binary classification: {model_name}")
+
+    bnb_config = (
+        BitsAndBytesConfig(
+            load_in_4bit=True,
+            bnb_4bit_use_double_quant=True,
+            bnb_4bit_quant_type="nf4",
+            bnb_4bit_compute_dtype=torch.bfloat16,
+        )
+        if quantize
+        else None
+    )
+
+    logger.info(f"Loading model {model_name} with bnb config:\n{bnb_config}")
+    config = AutoConfig.from_pretrained(model_name, trust_remote_code=True)
+    config.num_labels = 2
+    torch.cuda.empty_cache()
+
+    model = AutoModelForSequenceClassification.from_pretrained(
+        model_name,
+        config=config,
+        num_labels=2,
+        quantization_config=bnb_config,
+        torch_dtype=torch.bfloat16,
+        token=HF_TOKEN,
+        device_map="auto",
+        low_cpu_mem_usage=True,
+        trust_remote_code=True,
+    )
+
+    if hasattr(model, "gradient_checkpointing_enable"):
+        model.gradient_checkpointing_enable(
+            gradient_checkpointing_kwargs={"use_reentrant": False}
+        )
+    model.config.use_cache = False
+
+    if quantize:
+        logger.info("Preparing model for k-bit training")
+        model = prepare_model_for_kbit_training(model)
+
+    logger.info("Applying LoRA configuration")
+    lora_config = LoraConfig(
+        task_type=TaskType.SEQ_CLS,
         inference_mode=False,
         r=16,
         lora_alpha=32,

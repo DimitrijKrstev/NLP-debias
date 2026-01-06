@@ -6,6 +6,7 @@ from transformers import AutoTokenizer, PreTrainedTokenizer
 
 basicConfig(level=INFO, format="%(levelname)s - %(filename)s:%(lineno)d - %(message)s")
 
+from binary_classifier.main import run_train_binary_classifier
 from constants import DISTIL_OUTPUT_DIR
 from dataset.download import download_wnc
 from dataset.enums import TokenizationType
@@ -171,6 +172,18 @@ def test_tokenizer_match(
     logger.info(tokenizer_2.vocab_size)
     logger.info(tokenizer_1)
     logger.info(tokenizer_2)
+
+
+@app.command()
+def train_binary_classifier(
+    model_name: str = "Qwen/Qwen3-1.7B",
+    model_tokenizer_path: str = "Qwen/Qwen3-1.7B",
+    mlflow_experiment: str = "Binary-Classifier",
+    quantize: bool = True,
+) -> None:
+    run_train_binary_classifier(
+        model_name, model_tokenizer_path, mlflow_experiment, quantize
+    )
 
 
 if __name__ == "__main__":

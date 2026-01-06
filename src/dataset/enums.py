@@ -10,6 +10,7 @@ class DatasetSplit(StrEnum):
     TRAIN = "train"
     VALIDATION = "validation"
     TEST = "test"
+    FULL = "full"
 
 
 class TokenizationType(StrEnum):
@@ -18,3 +19,4 @@ class TokenizationType(StrEnum):
     GRPO = "GRPO"
     DISTIL = "DISTIL"
     DPO = "DPO"
+    BINARY_CLASSIFICATION = "BinaryClassification"

@@ -2,6 +2,7 @@ from logging import getLogger
 from typing import Any
 
 from datasets import Dataset  # type: ignore[import-untyped]
+from datasets import concatenate_datasets
 from pandas import DataFrame, read_csv
 
 from constants import SYSTEM_PROMPT
@@ -212,10 +213,45 @@ def tokenize_for_distillation(dataset: Dataset, tokenizer: Any) -> Dataset:
     ).remove_columns([WNCColumn.NEUTRAL])
 
 
+def tokenize_for_binary_classification(dataset: Dataset, tokenizer: Any) -> Dataset:
+    biased_data = dataset.map(
+        lambda x: {
+            "text": x[WNCColumn.BIASED],
+            "label": 1,
+        },
+        remove_columns=dataset.column_names,
+    )
+
+    neutral_data = dataset.map(
+        lambda x: {
+            "text": x[WNCColumn.NEUTRAL],
+            "label": 0,
+        },
+        remove_columns=dataset.column_names,
+    )
+
+    combined = concatenate_datasets([biased_data, neutral_data])
+
+    def tokenize_function(examples):
+        tokenized = tokenizer(
+            examples["text"],
+            padding="max_length",
+            truncation=True,
+            max_length=1024,
+        )
+        tokenized["labels"] = examples["label"]
+        return tokenized
+
+    return combined.map(
+        tokenize_function, batched=True, remove_columns=["text", "label"]
+    )
+
+
 TOKENIZE_FUNCTION_BY_TYPE = {
     TokenizationType.SFT: tokenize_for_sft,
     TokenizationType.EVAL: tokenize_for_evaluation,
     TokenizationType.GRPO: tokenize_for_grpo,
     TokenizationType.DPO: tokenize_for_dpo,
     TokenizationType.DISTIL: tokenize_for_distillation,
+    TokenizationType.BINARY_CLASSIFICATION: tokenize_for_binary_classification,
 }
