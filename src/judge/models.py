@@ -5,7 +5,6 @@ class ModelResponseEvaluation(BaseModel):
     neutrality: int
     meaning_preservation: int
     fluency: int
-    faithfulness_to_reference: int
     edit_minimality: int
     overall_reasoning: str | None
 
@@ -13,12 +12,11 @@ class ModelResponseEvaluation(BaseModel):
         "neutrality",
         "meaning_preservation",
         "fluency",
-        "faithfulness_to_reference",
         "edit_minimality",
     )
     def validate_range(cls, value, field):
-        if not -10 <= value <= 10:
-            raise ValueError(f"{field.name} must be between -10 and 10, got {value}")
+        if not -3 <= value <= 3:
+            raise ValueError(f"{field.name} must be between -3 and 3, got {value}")
         return value
 
     def get_normalized_full_score(self) -> float:
@@ -26,6 +24,5 @@ class ModelResponseEvaluation(BaseModel):
             self.neutrality
             + self.meaning_preservation
             + (self.fluency * 0.5)
-            + (self.faithfulness_to_reference * 0.5)
             + (self.edit_minimality * 0.5)
-        ) / 35.0
+        ) / 9.0

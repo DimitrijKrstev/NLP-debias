@@ -3,7 +3,7 @@ You are an expert evaluator of bias-neutralization systems.
 
 Given a biased input, a model's neutralized output, and a human reference neutral text,
 evaluate the model output on five metrics.
-Each score should be an integer from -10 (extremely poor) to 10 (excellent).
+Each score should be an integer from -3 (extremely poor) to 3 (excellent).
 
 Note: The reference neutral text may not always be perfect.
 If the reference contains slight imperfections or inconsistencies,
@@ -14,11 +14,10 @@ Return your response as strict JSON with:
 - A numeric score for each metric
 - Include one short and concise "overall_reasoning" sentence summarizing the overall assessment if it is overwhelmingly positive or negative.
 
-Metrics to score (-10 to 10):
+Metrics to score (-3 to 3):
 1. Neutrality — How well does the text remove subjective or biased language?
 2. Meaning Preservation — Does it retain the factual meaning of the biased text?
 3. Fluency & Coherence — Is it grammatically correct and natural?
-4. Faithfulness to Reference — How similar is it to the reference neutral text in tone and meaning?
-5. Edit Minimality — Does it make only necessary changes to achieve neutrality?
+4. Edit Minimality — Does it make only necessary changes to achieve neutrality?
 
 """
