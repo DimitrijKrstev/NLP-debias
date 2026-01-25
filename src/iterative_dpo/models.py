@@ -20,6 +20,14 @@ class SentenceWithRank:
         return hash((self.id, self.text))
 
 
+@dataclass(frozen=True, slots=True)
+class PreferencePair:
+    prompt: list[dict[str, str]]
+    formatted_prompt: str
+    chosen: str
+    rejected: str
+
+
 class ModelOutputSentenceWithRank(BaseModel):
     id: int
     rank: int

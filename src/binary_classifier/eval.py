@@ -9,8 +9,8 @@ def evaluate_model(
     model: PreTrainedModel, dataloader: DataLoader
 ) -> tuple[float, float]:
     model.eval()
-    all_predictions = []
-    all_labels = []
+    all_predictions: list[int] = []
+    all_labels: list[int] = []
 
     with torch.no_grad():
         for batch in tqdm(dataloader, desc="Evaluating"):

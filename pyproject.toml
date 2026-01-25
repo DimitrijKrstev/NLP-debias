@@ -38,3 +38,7 @@ dependencies = [
 multi_line_output = 3
 force_grid_wrap = 0
 include_trailing_comma = true
+
+[[tool.mypy.overrides]]
+module = "sklearn.*"
+ignore_missing_imports = true

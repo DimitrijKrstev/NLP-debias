@@ -77,9 +77,9 @@ def run_iterative_dpo_training(
             )
 
             dataset_dict = {
-                "prompt": [pair["formatted_prompt"] for pair in preference_pairs],
-                "chosen": [pair["chosen"] for pair in preference_pairs],
-                "rejected": [pair["rejected"] for pair in preference_pairs],
+                "prompt": [pair.formatted_prompt for pair in preference_pairs],
+                "chosen": [pair.chosen for pair in preference_pairs],
+                "rejected": [pair.rejected for pair in preference_pairs],
             }
             train_dataset = Dataset.from_dict(dataset_dict)
 

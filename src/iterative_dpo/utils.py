@@ -2,7 +2,7 @@ from csv import DictWriter
 from logging import getLogger
 from os import getenv
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import List
 
 import mlflow
 import torch
@@ -19,6 +19,7 @@ from iterative_dpo.constants import (
 from iterative_dpo.models import (
     ModelOutputSentenceWithRank,
     ModelPreference,
+    PreferencePair,
     SentenceWithRank,
 )
 from utils import remove_thinking_tags
@@ -92,14 +93,14 @@ def generate_responses_with_temperatures(
 
 
 def create_preference_pairs(
-    prompts: List[List[Dict[str, str]]],
+    prompts: list[list[dict[str, str]]],
     formatted_prompts: List[str],
     biased_texts: List[str],
     ground_truth_texts: List[str],
     all_responses: List[List[str]],
     judge_model_name: str,
     iteration: int = 0,
-) -> List[Dict[str, Any]]:
+) -> list[PreferencePair]:
     pairs = []
     for sample_idx, (
         prompt,
@@ -117,15 +118,23 @@ def create_preference_pairs(
             iteration,
             sample_idx,
         )
-        for better_idx, worse_idx in zip([0, 0, 1, 1], [1, 3, 2, 3]):
-            pairs.append(
-                {
-                    "prompt": prompt,
-                    "formatted_prompt": formatted_prompt,
-                    "chosen": sorted_responses[better_idx],
-                    "rejected": sorted_responses[worse_idx],
-                }
+        pairs = [
+            PreferencePair(
+                prompt,
+                formatted_prompt,
+                sorted_responses[better_idx],
+                sorted_responses[worse_idx],
             )
+            for better_idx, worse_idx in zip([0, 0, 1], [1, 3, 3])
+        ] + [
+            PreferencePair(
+                prompt,
+                formatted_prompt,
+                sorted_responses[i],
+                biased_text,
+            )
+            for i in range(3)
+        ]
 
     return pairs
 
@@ -154,7 +163,7 @@ def _rank_responses_with_judge(
         )
         logger.info(
             f"Rank for ground truth: {ground_truth.rank} "
-            f"best rank id: {min(model_preference.sentences, key=lambda x: x.rank).id}"
+            f"best rank id: {min(model_preference.sentences, key=lambda x: x.rank).id} "
             f"worst rank id: {max(model_preference.sentences, key=lambda x: x.rank).id}"
         )
     except StopIteration:
