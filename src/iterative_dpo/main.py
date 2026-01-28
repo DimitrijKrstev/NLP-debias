@@ -13,7 +13,7 @@ from iterative_dpo.utils import (
     generate_responses_with_temperatures,
     get_dpo_config,
 )
-from utils import load_unsloth_model
+from unsloth_load import load_unsloth_model
 
 logger = getLogger(__name__)
 
@@ -25,6 +25,8 @@ def run_iterative_dpo_training(
     judge_model_name: str,
     quantize: bool,
     sample_train_batch: int,
+    output_dir: str,
+    previous_checkpoint_path: str | None = None,
 ) -> None:
     mlflow.set_experiment(mlflow_experiment)
 
@@ -86,11 +88,11 @@ def run_iterative_dpo_training(
             dpo_trainer = DPOTrainer(
                 model=model,
                 processing_class=tokenizer,
-                args=get_dpo_config(model_name),
+                args=get_dpo_config(model_name, output_dir),
                 train_dataset=train_dataset,
             )
 
-            train_result = dpo_trainer.train()
+            train_result = dpo_trainer.train(resume_from_checkpoint=previous_checkpoint_path)
 
             train_loss = train_result.metrics.get("train_loss", 0.0)
             logger.info(f"Iteration {iteration} - train_loss: {train_loss:.4f}")

@@ -153,6 +153,8 @@ def train_iterative_dpo(
     judge_model_name: str = "gpt-5-mini",
     quantize: bool = True,
     batch_size: int = 25,
+    output_dir: str = "./iterative-dpo-output",
+    previous_checkpoint_path: str | None = None,
 ) -> None:
     run_iterative_dpo_training(
         model_name=model_name,
@@ -161,6 +163,8 @@ def train_iterative_dpo(
         judge_model_name=judge_model_name,
         quantize=quantize,
         sample_train_batch=batch_size,
+        output_dir=output_dir,
+        previous_checkpoint_path=previous_checkpoint_path,
     )
 
 

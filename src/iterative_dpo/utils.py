@@ -32,13 +32,13 @@ CLIENT = OpenAI(api_key=OPENAI_KEY)
 logger = getLogger(__name__)
 
 
-def get_dpo_config(model_name: str) -> DPOConfig:
+def get_dpo_config(model_name: str, output_dir: str) -> DPOConfig:
     bf16_supported = (
         torch.cuda.is_available() and torch.cuda.get_device_capability()[0] >= 8
     )
 
     return DPOConfig(
-        output_dir=model_name,
+        output_dir=output_dir,
         per_device_train_batch_size=2,
         num_train_epochs=1,
         learning_rate=1e-6,

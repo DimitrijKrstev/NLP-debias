@@ -4,7 +4,7 @@ from os import getenv
 from pathlib import Path
 
 from dotenv import load_dotenv
-from instructor import from_openai
+from instructor import from_openai  # type: ignore
 from openai import OpenAI
 
 from judge.models import ModelResponseEvaluation

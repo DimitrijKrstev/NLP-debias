@@ -12,7 +12,13 @@ from utils import load_peft_model, load_tokenizer
 logger = getLogger(__name__)
 
 
-def run_grpo_training(model_name: str, mlflow_experiment: str, quantize: bool, output_dir: str, previous_checkpoint_path: str | None = None) -> None:
+def run_grpo_training(
+    model_name: str,
+    mlflow_experiment: str,
+    quantize: bool,
+    output_dir: str,
+    previous_checkpoint_path: str | None = None,
+) -> None:
     mlflow.set_experiment(mlflow_experiment)
 
     tokenizer = load_tokenizer(model_name)

@@ -7,7 +7,7 @@ from constants import TRAIN_OUTPUT_DIR
 from dataset.enums import DatasetSplit, TokenizationType
 from dataset.preprocess import get_dataset_split
 from sft.utils import get_training_args
-from utils import load_unsloth_model
+from utils import load_model, load_tokenizer
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +21,8 @@ def train_model(quantize: bool, mlflow_experiment: str, model_name: str) -> None
         mlflow.set_tag("task", "training")
         mlflow.set_tag("training_type", "sft")
 
-        model, tokenizer = load_unsloth_model(model_name, quantize)
+        model = load_model(model_name, quantize)
+        tokenizer = load_tokenizer(model_name)
         model.train()
 
         train_dataset = get_dataset_split(

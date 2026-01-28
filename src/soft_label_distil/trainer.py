@@ -1,5 +1,4 @@
 from logging import getLogger
-from os import environ
 from typing import Any, List
 
 import torch
@@ -11,8 +10,6 @@ from soft_label_distil.utils import (
     build_teacher_distribution,
     get_teacher_logprobs,
 )
-
-environ["UNSLOTH_RETURN_LOGITS"] = "1"
 
 logger = getLogger(__name__)
 
@@ -50,7 +47,6 @@ class DistillationTrainer(Trainer):
     def compute_loss(
         self, model, inputs, return_outputs=False, num_items_in_batch=None
     ):
-        environ["UNSLOTH_RETURN_LOGITS"] = "1"
         outputs = model(
             **{
                 input: value
