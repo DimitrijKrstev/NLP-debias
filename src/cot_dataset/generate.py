@@ -1,4 +1,5 @@
 """Generate CoT dataset using async LiteLLM calls."""
+
 import asyncio
 import json
 import os
@@ -6,7 +7,6 @@ import platform
 import warnings
 from datetime import datetime
 from logging import getLogger
-from pathlib import Path
 
 from dotenv import load_dotenv
 from litellm import acompletion
@@ -59,7 +59,9 @@ async def generate_single_cot(
                 "model": TEACHER_MODEL,
             }
         except Exception as e:
-            logger.error(f"Error generating CoT for text: {biased_text[:50]}... Error: {e}")
+            logger.error(
+                f"Error generating CoT for text: {biased_text[:50]}... Error: {e}"
+            )
             return None
 
 
@@ -110,7 +112,9 @@ async def generate_cot_dataset_async(
     new_results = []
     completed_count = 0
 
-    for coro in tqdm(asyncio.as_completed(tasks), total=len(tasks), desc="Generating CoT"):
+    for coro in tqdm(
+        asyncio.as_completed(tasks), total=len(tasks), desc="Generating CoT"
+    ):
         result = await coro
         if result is not None:
             new_results.append(result)
@@ -119,7 +123,9 @@ async def generate_cot_dataset_async(
             # Periodic save
             if completed_count % SAVE_EVERY == 0:
                 _save_results(existing_results + new_results)
-                logger.info(f"Checkpoint: Saved {len(existing_results) + len(new_results)} total entries")
+                logger.info(
+                    f"Checkpoint: Saved {len(existing_results) + len(new_results)} total entries"
+                )
 
     # Final save
     all_results = existing_results + new_results

@@ -8,12 +8,11 @@ basicConfig(level=INFO, format="%(levelname)s - %(filename)s:%(lineno)d - %(mess
 
 
 from binary_classifier.main import run_train_binary_classifier
+from constants import DISTIL_OUTPUT_DIR
 from cot_dataset.constants import MAX_CONCURRENT_REQUESTS
 from cot_dataset.generate import generate_cot_dataset
-from dataset.enums import DatasetSplit
-from constants import DISTIL_OUTPUT_DIR
 from dataset.download import download_wnc
-from dataset.enums import TokenizationType
+from dataset.enums import DatasetSplit, TokenizationType
 from evaluation.eval_model import evaluate_model
 from iterative_dpo.main import run_iterative_dpo_training
 from judge.main import get_judge_score
@@ -188,7 +187,6 @@ def train_binary_classifier(
     run_train_binary_classifier(
         model_name, model_tokenizer_path, mlflow_experiment, quantize
     )
-
 
 
 @app.command()
