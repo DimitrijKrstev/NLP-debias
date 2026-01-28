@@ -193,10 +193,11 @@ def train_binary_classifier(
 def generate_cot_data(
     dataset_split: DatasetSplit = DatasetSplit.TRAIN,
     max_concurrent: int = MAX_CONCURRENT_REQUESTS,
+    model_name: str = "openrouter/openai/gpt-5-mini",
 ) -> None:
     """Generate CoT dataset using teacher model."""
     logger.info(f"Generating CoT dataset for {dataset_split} split")
-    results = generate_cot_dataset(dataset_split, max_concurrent)
+    results = generate_cot_dataset(dataset_split, max_concurrent, model_name)
     logger.info(f"Generated {len(results)} CoT entries")
 
 

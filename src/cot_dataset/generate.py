@@ -18,7 +18,6 @@ from cot_dataset.constants import (
     OUTPUT_DIR,
     SAVE_EVERY,
     TARGET_STYLE,
-    TEACHER_MODEL,
 )
 from cot_dataset.prompts import create_cot_prompt_few_shot
 from dataset.constants import DATASET_SLICE_BY_SPLIT_TYPE
@@ -28,6 +27,7 @@ from dataset.preprocess import get_preprocessed_dataset_slice
 load_dotenv()
 logger = getLogger(__name__)
 
+TEACHER_MODEL = ""
 # Windows async setup
 if platform.system() == "Windows":
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
@@ -145,8 +145,11 @@ def _save_results(results: list[dict]) -> None:
 def generate_cot_dataset(
     dataset_split: DatasetSplit = DatasetSplit.TRAIN,
     max_concurrent: int = MAX_CONCURRENT_REQUESTS,
+    model_name: str = "openrouter/openai/gpt-5-mini",
 ) -> list[dict]:
     """Synchronous wrapper for async generation."""
+    global TEACHER_MODEL
+    TEACHER_MODEL = model_name
     if platform.system() == "Windows":
         return asyncio.run(generate_cot_dataset_async(dataset_split, max_concurrent))
     else:
