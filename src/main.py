@@ -6,6 +6,9 @@ from transformers import AutoTokenizer, PreTrainedTokenizer
 
 basicConfig(level=INFO, format="%(levelname)s - %(filename)s:%(lineno)d - %(message)s")
 
+from bias_classifier.constants import MODEL_NAME as BIAS_CLASSIFIER_MODEL_NAME
+from bias_classifier.constants import MODEL_OUTPUT_DIR as BIAS_CLASSIFIER_OUTPUT_DIR
+from bias_classifier.main import run_eval_bias_classifier, run_train_bias_classifier
 from binary_classifier.main import run_train_binary_classifier
 from constants import DISTIL_OUTPUT_DIR
 from dataset.download import download_wnc
@@ -184,6 +187,24 @@ def train_binary_classifier(
     run_train_binary_classifier(
         model_name, model_tokenizer_path, mlflow_experiment, quantize
     )
+
+
+@app.command()
+def train_bias_classifier(
+    model_name: str = BIAS_CLASSIFIER_MODEL_NAME,
+    mlflow_experiment: str = "Bias-Classifier",
+) -> None:
+    logger.info(f"Training bias classifier with {model_name}")
+    run_train_bias_classifier(model_name, mlflow_experiment)
+
+
+@app.command()
+def eval_bias_classifier(
+    model_path: str = str(BIAS_CLASSIFIER_OUTPUT_DIR),
+    mlflow_experiment: str = "Bias-Classifier",
+) -> None:
+    logger.info(f"Evaluating bias classifier from {model_path}")
+    run_eval_bias_classifier(model_path, mlflow_experiment)
 
 
 if __name__ == "__main__":
