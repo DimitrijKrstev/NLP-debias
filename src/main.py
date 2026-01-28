@@ -6,7 +6,11 @@ from transformers import AutoTokenizer, PreTrainedTokenizer
 
 basicConfig(level=INFO, format="%(levelname)s - %(filename)s:%(lineno)d - %(message)s")
 
+
 from binary_classifier.main import run_train_binary_classifier
+from cot_dataset.constants import MAX_CONCURRENT_REQUESTS
+from cot_dataset.generate import generate_cot_dataset
+from dataset.enums import DatasetSplit
 from constants import DISTIL_OUTPUT_DIR
 from dataset.download import download_wnc
 from dataset.enums import TokenizationType
@@ -184,6 +188,18 @@ def train_binary_classifier(
     run_train_binary_classifier(
         model_name, model_tokenizer_path, mlflow_experiment, quantize
     )
+
+
+
+@app.command()
+def generate_cot_data(
+    dataset_split: DatasetSplit = DatasetSplit.TRAIN,
+    max_concurrent: int = MAX_CONCURRENT_REQUESTS,
+) -> None:
+    """Generate CoT dataset using teacher model."""
+    logger.info(f"Generating CoT dataset for {dataset_split} split")
+    results = generate_cot_dataset(dataset_split, max_concurrent)
+    logger.info(f"Generated {len(results)} CoT entries")
 
 
 if __name__ == "__main__":
