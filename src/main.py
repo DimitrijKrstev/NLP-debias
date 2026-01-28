@@ -68,11 +68,15 @@ def train_rl_model(
     model_name: str = "Qwen/Qwen3-1.7B",
     mflow_experiment: str = "RL-NLP-Debias",
     quantize: bool = True,
+    output_dir: str = "./grpo-debiasing-model",
+    previous_checkpoint_path: str | None = None,
 ) -> None:
     run_grpo_training(
         model_name,
         mflow_experiment,
         quantize,
+        output_dir,
+        previous_checkpoint_path,
     )
 
 

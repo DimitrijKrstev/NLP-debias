@@ -44,12 +44,12 @@ def sync_model_tokenizer_config(model, tokenizer):
         model.generation_config.eos_token_id = tokenizer.eos_token_id
 
 
-def get_grpo_config(model_name: str) -> GRPOConfig:
+def get_grpo_config(model_name: str, output_dir: str) -> GRPOConfig:
     return GRPOConfig(
-        output_dir="./grpo-debiasing-model",
+        output_dir=output_dir,
         run_name=f"{model_name}-grpo-debiasing",
-        per_device_train_batch_size=3,
-        num_train_epochs=3,
+        per_device_train_batch_size=1,
+        num_train_epochs=1,
         learning_rate=1e-6,
         num_generations=3,
         generation_batch_size=3,
@@ -65,7 +65,7 @@ def get_grpo_config(model_name: str) -> GRPOConfig:
         save_steps=100,
         save_total_limit=3,
         gradient_checkpointing=False,
-        bf16=True,
+        bf16=False,
         remove_unused_columns=False,
         report_to="mlflow",
     )
