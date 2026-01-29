@@ -6,10 +6,13 @@ from transformers import AutoTokenizer, PreTrainedTokenizer
 
 basicConfig(level=INFO, format="%(levelname)s - %(filename)s:%(lineno)d - %(message)s")
 
+
 from binary_classifier.main import run_train_binary_classifier
 from constants import DISTIL_OUTPUT_DIR
+from cot_dataset.constants import MAX_CONCURRENT_REQUESTS
+from cot_dataset.generate import generate_cot_dataset
 from dataset.download import download_wnc
-from dataset.enums import TokenizationType
+from dataset.enums import DatasetSplit, TokenizationType
 from evaluation.eval_model import evaluate_model
 from iterative_dpo.main import run_iterative_dpo_training
 from judge.main import get_judge_score
@@ -192,6 +195,18 @@ def train_binary_classifier(
     run_train_binary_classifier(
         model_name, model_tokenizer_path, mlflow_experiment, quantize
     )
+
+
+@app.command()
+def generate_cot_data(
+    dataset_split: DatasetSplit = DatasetSplit.TRAIN,
+    max_concurrent: int = MAX_CONCURRENT_REQUESTS,
+    model_name: str = "openrouter/openai/gpt-5-mini",
+) -> None:
+    """Generate CoT dataset using teacher model."""
+    logger.info(f"Generating CoT dataset for {dataset_split} split")
+    results = generate_cot_dataset(dataset_split, max_concurrent, model_name)
+    logger.info(f"Generated {len(results)} CoT entries")
 
 
 if __name__ == "__main__":
