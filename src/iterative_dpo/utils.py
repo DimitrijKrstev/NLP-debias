@@ -118,7 +118,7 @@ def create_preference_pairs(
             iteration,
             sample_idx,
         )
-        pairs = [
+        pairs += [
             PreferencePair(
                 prompt,
                 formatted_prompt,
