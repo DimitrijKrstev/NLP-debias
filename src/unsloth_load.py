@@ -1,11 +1,13 @@
 import os
 from logging import getLogger
 from typing import Any
-from unsloth import FastLanguageModel # type: ignore
+
+from unsloth import FastLanguageModel  # type: ignore
 
 HF_TOKEN = os.getenv("HF_TOKEN")
 
 logger = getLogger(__name__)
+
 
 def load_unsloth_model(model_name: str, quantize: bool) -> tuple[Any, Any]:
     logger.info(f"Loading model with Unsloth: {model_name}")

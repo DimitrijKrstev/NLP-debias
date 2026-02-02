@@ -30,7 +30,7 @@ logger = getLogger(__name__)
 TEACHER_MODEL = ""
 # Windows async setup
 if platform.system() == "Windows":
-    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())  # type: ignore[attr-defined]
     warnings.filterwarnings("ignore", category=ResourceWarning)
 
 

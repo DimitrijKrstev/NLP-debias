@@ -1,10 +1,12 @@
 from logging import getLogger
+from pathlib import Path
 
 import mlflow
 from datasets import Dataset  # type: ignore
 from tqdm import tqdm
 from trl.trainer.dpo_trainer import DPOTrainer
 
+from constants import TRAIN_OUTPUT_DIR
 from dataset.enums import DatasetSplit, TokenizationType, WNCColumn
 from dataset.preprocess import get_dataset_split
 from iterative_dpo.constants import ITERATIVE_DPO_OUTPUT_DIR
@@ -25,10 +27,12 @@ def run_iterative_dpo_training(
     judge_model_name: str,
     quantize: bool,
     sample_train_batch: int,
-    output_dir: str,
+    output_dir: str | None = None,
     previous_checkpoint_path: str | None = None,
 ) -> None:
     mlflow.set_experiment(mlflow_experiment)
+
+    output_location = output_dir or ITERATIVE_DPO_OUTPUT_DIR
 
     logger.info(f"Loading base model: {model_name}")
     model, tokenizer = load_unsloth_model(model_name, quantize)
@@ -88,16 +92,21 @@ def run_iterative_dpo_training(
             dpo_trainer = DPOTrainer(
                 model=model,
                 processing_class=tokenizer,
-                args=get_dpo_config(model_name, output_dir),
+                args=get_dpo_config(model_name, output_dir or TRAIN_OUTPUT_DIR),
                 train_dataset=train_dataset,
             )
 
-            train_result = dpo_trainer.train(resume_from_checkpoint=previous_checkpoint_path)
+            train_result = dpo_trainer.train(
+                resume_from_checkpoint=previous_checkpoint_path
+            )
+            previous_checkpoint_path = None
 
             train_loss = train_result.metrics.get("train_loss", 0.0)
             logger.info(f"Iteration {iteration} - train_loss: {train_loss:.4f}")
 
-            checkpoint_dir = ITERATIVE_DPO_OUTPUT_DIR / f"checkpoint-iter-{iteration}"
+            checkpoint_dir = (
+                Path(output_location) / "iterative_dpo" / f"checkpoint-iter-{iteration}"
+            )
             model.save_pretrained(checkpoint_dir)
             tokenizer.save_pretrained(checkpoint_dir)
 
@@ -109,7 +118,7 @@ def run_iterative_dpo_training(
 
         pbar.close()
 
-    model.save_pretrained(ITERATIVE_DPO_OUTPUT_DIR)
-    tokenizer.save_pretrained(ITERATIVE_DPO_OUTPUT_DIR)
+    model.save_pretrained(output_location)
+    tokenizer.save_pretrained(output_location)
 
     logger.info("Iterative DPO training completed")
